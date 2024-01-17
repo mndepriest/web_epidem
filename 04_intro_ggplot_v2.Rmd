@@ -3,7 +3,7 @@
 ```
 ---
 title: "**ggplot2: a package for creating visualizations in R**"
-author: "Paul Esker; Mauricio Serrano; Felipe Dalla Lana"
+author: "Paul Esker; Mauricio Serrano; Felipe Dalla Lana, Miranda DePriest"
 output:
   html_document:
     code_folding: show
@@ -31,7 +31,7 @@ The structure of `ggplot2` was inspired by the book [The Grammar of Graphics](ht
 ### **Components of ggplot2 plots**
 The most important components of ggplot2 graphs are:
 
--   **Geometric Elements**: where you can determine your plot type 
+-   **Geometric elements**: where you can determine your plot type 
 -   **Aesthetics**: where you can use `aes()` arguments (short for 'aesthetics') to assign characteristics like color and size to elements of your graph
 -   **Scales**: where you can applied *scaled* characteristics, like gradients of color, to your graph
 -   **Facets**: where you can split graphs by variable(s) to create meaningful figures
@@ -50,16 +50,24 @@ knitr::include_graphics("figures/intro_r/extention_ggplot2.png")
 
 # **Hands-on plotting**
 
-First, we will load in `ggplot2` and our example data from the last lesson (Intro to R). Remember that `ggplot2` is a core package in `tidyverse`, so it can be loaded with `library("ggplot2")` or `library("tidyverse")`.
+First, we will load in `ggplot2` and our example data from the last lesson (Intro to R). Remember that `ggplot2` is a core package in `tidyverse`, so it can be loaded with `library("ggplot2")` or `library("tidyverse")`. We'll also include `conflicted()` since there are some instances of different packages using identical functions. 
 
 ```{r}
+# Load tidyverse (which includes ggplot2) and conflicted packages
 library(tidyverse)
+library(conflicted)
 
+# Tell R which version of `filter()` you want to use
+conflicts_prefer(dplyr::filter)
+
+# Load in the example data and inspect it
 data_demo <- readr::read_csv("data/intro_r/data_demo.csv")
 data_demo 
 ```
 
 <br>
+
+**Note:** You can inspect the data more closely by clicking on it in the Global Environment. This panel is typically in the upper right corner. 
 
 Every `ggplot2` plot starts with the function, `ggplot()`. This initializes the plot, and is where you will define the data you want used to create the plot. In this case, the data we want to use is in the data_demo object we just loaded in. Let's investigate how `ggplot()` works without any input:
 
@@ -70,7 +78,7 @@ ggplot()
 
 <br>
 
-Note: when you do not inform `ggplot2` of what data you want to plot, the function `ggplot()` will only print a gray panel. It has initialized the plot, but doesn't have any data to map yet.
+**Note:** when you do not inform `ggplot2` of what data you want to plot, the function `ggplot()` will only print a gray panel. It has initialized the plot, but doesn't have any data to map yet.
 
 This is where *data* and *aesthetics* enter the discussion as arguments within the `ggplot()` function. The data argument is pretty self-explanatory, but the arguments within `aes()` determines the appearance of the plot. In this case, it determines the variables we are going to map and which axis they will belong to.
 
@@ -226,17 +234,6 @@ Aesthetics can refer to multiple characteristics. The most common characteristic
 -   Shape 
 -   Line type
 
-### **Axes-variable assignment**
-
-We've actually already used `aes()` arguments within `ggplot()` to assign variables 'trt' and 'yld' to the x and y-axis. Look at what happens if we don't:
-
-```{r}
-ggplot(data = data_demo) 
-```
-
-<br>
-
-R can't create a plot because it doesn't know which of data_demo's variables to use.
 
 ### **Colors**
 
@@ -1020,7 +1017,7 @@ We can further customize these elements with theme components.
 
 Theme components can be used to modify non-data components of the plot, such as title location, background color, the use of grid lines, and more. `theme_*()` functions are used to add these component. 
 
-`ggplot2` contains 10 pre-set themes and has options to add further customization. Other packages like [`ggthemes()`](https://yutannihilation.github.io/allYourFigureAreBelongToUs/ggthemes/) and [`bbplot()`](https://github.com/bbc/bbplot/) offer more theme pre-sets. Themes can be useful when showing plots in different settings, such as with projectors, on colored paper, or in journals with figure specifications. 
+`ggplot2` contains 10 pre-set themes and has options to add further customization. Other packages like [`ggthemes()`](https://yutannihilation.github.io/allYourFigureAreBelongToUs/ggthemes/) offer more theme pre-sets. Themes can be useful when showing plots in different settings, such as with projectors, on colored paper, or in journals with figure specifications. 
 
 ### **Built-in themes**
 
@@ -1056,12 +1053,10 @@ ggplot(data = data_demo, aes(x = trt, y = yld)) +
 
 Examples of all 10 of the pre-set themes of `ggplot2` can be viewed [here](https://ggplot2.tidyverse.org/reference/ggtheme.html).
 
-Themes from extension packages `ggthemes` and `bbplot()` are applied in the same way:
 
 ```{r}
-# Load in ggthemes and bbplot
+# Load in ggthemes
 library("ggthemes")
-library("bbplot")
 
 # Use ggthemes
 ggplot(data = data_demo, aes(x = trt, y = yld)) +
@@ -1071,13 +1066,6 @@ ggplot(data = data_demo, aes(x = trt, y = yld)) +
   labs(y = "Yield (bu/ac)", x = "Treatments", fill = "Treatments") +
    theme_economist() # Use theme 'economist' from ggthemes
 
-# Use bbplot
-ggplot(data = data_demo, aes(x = trt, y = yld)) +
-  geom_boxplot(outlier.alpha = 0) + 
-  geom_jitter(aes(fill = trt), shape = 21, width = 0.2, size = 4) +
-  scale_fill_npg() +
-  labs(y = "Yield (bu/ac)", x = "Treatments", fill = "Treatments") +
-   bbc_style() # Use theme 'bbc_style' from bbplot
 
 ```
 
