@@ -35,4 +35,4 @@ The development of these materials was funded by projects:
 
 -   *Can You Spot It? Improving Management Recommendations in Wheat Using the Three "E\`s": Epidemiology, Extension, and Education*, USDA-NIFA Award Number: 2020-67013-31920
 
-[![PSU_logo](./figures/PSU_logo.png "PPEM website")](https://plantpath.psu.edu/)
+[![PSU_logo](./figures/psu_logo.png "PPEM website")](https://plantpath.psu.edu/)

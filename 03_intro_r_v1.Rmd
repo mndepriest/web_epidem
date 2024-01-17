@@ -883,7 +883,7 @@ Now that we have defined a project, we need to import our data into R. In the fo
 
 # Note that we don't have to type the full path to data_demo. This is because we have defined the work directory.
 # That means that this:
-# data_demo <- readr::read_csv("C:/Users/mnd20.PSU/OneDrive - The Pennsylvania State University/Esker Lab/web_epidem/data/intro_r/data_demo.csv")
+# data_demo <- readr::read_csv("C:/Users/mnd20/web_epidem/data/intro_r/data_demo.csv")
 # is equivalent to this:
 data_demo <- readr::read_csv("data/intro_r/data_demo.csv")
 data_demo
@@ -1108,22 +1108,22 @@ We can take this opportunity to save our resulting tables to a sub-folder within
 
 ```{r}
 # Install and load openxlsx package, if necessary:
-# install.packages("openxlsx")
-# library("openxlsx")
+install.packages("openxlsx", repos = "http://cran.us.r-project.org")
+library("openxlsx")
 
 # Define the data object you want to save and provide the path you want the file to go, including any sub-folders. Don't forget to include the desired name of the file ('example_output.xlsx') in the path! 
 write.xlsx(data_longer, # File that we want export
-            file = "1_intro_to_R/data/intro_r/example_output.xlsx") # location and name of our .xlsx
+            file = "./data/intro_r/example_output.xlsx") # location and name of our .xlsx
 
 # You can further modify how you save your data with arguments such as sheetName (for Excel files with multiple sheets) and append, if you want to join the contents of this table to another file.
 write.xlsx(data_longer, # File that we want export
-            file = "1_intro_to_R/data/intro_r/example_output.xlsx",
+            file = "./data/intro_r/example_output.xlsx",
             sheetName="First_example", # Sheet name within Excel file
             append=FALSE) # If append=TRUE, you can specify another file to add data_longer to.
 
 # If you'd like to save multiple tables together, you can also join them in a list within the R environment and save that object with write.xlsx().  
 two_data_frame <- list('ex_1' = data_demo, 'ex_2' = data_longer)
-write.xlsx(two_data_frame, file = "1_intro_to_R/data/intro_r/two_sheets.xlsx")
+write.xlsx(two_data_frame, file = "./data/intro_r/two_sheets.xlsx")
 
 ```
 
