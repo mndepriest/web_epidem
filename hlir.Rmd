@@ -1,0 +1,58 @@
+---
+title: "HLIR"
+author: "Felipe Dalla Lana; Mladen Cucak; Paul Esker"
+output: 
+  html_document:
+    code_folding: show
+    toc: true
+    toc_float:
+      toc_depth: 3
+      collapsed: false
+      smooth_scroll: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Libraries
+
+```{r libs, message=FALSE, warning=FALSE}
+# R convenience packages
+library("conflicted")
+library("here") #helps with the reproducibility across operating systems
+
+# Data mundging 
+library("dplyr")
+
+# App building pckages
+library("shiny")
+library("shinythemes")
+library("DT")
+library("shinydashboard")
+
+# Computation
+library("deSolve")  # Solvers for Initial Value Problems of Differential Equations
+
+# Plotting 
+library("ggplot2")
+
+# Packages with same functions can cause problems 
+ conflict_prefer("filter", "dplyr")
+```
+
+# App
+
+<!-- # ```{r hlir_app, echo=FALSE} -->
+<!-- # shiny::shinyAppDir( -->
+<!-- #   here::here( "5_HLIR/apps"), -->
+<!-- #   options = list( -->
+<!-- #     width = "130%", height = 900 -->
+<!-- #   ) -->
+<!-- # ) -->
+<!-- #  -->
+<!-- # ``` -->
+```{r}
+knitr::include_app("https://felipedallalana.shinyapps.io/Temporal_shiny/?showcase=0",
+ height = "950px")
+```

@@ -1,0 +1,34 @@
+---
+title: "Welcome!"
+---
+
+### About
+
+These materials have been developed for teaching plant disease epidemiology on any level. Besides this the idea is to inspire potential learners to acquire some coding and quantitative skills, which are in need in the world of plant diseases. Here we introduce a very popular tool in the world of statistics and data science, the R language.\
+Very similar materials exist on [APS website](https://www.apsnet.org/edcenter/disimpactmngmnt/topc/EcologyAndEpidemiologyInR/Pages/default.aspx) and here we tried to refresh these resources using newer software. One of main ideas is to add the interactive element which allows learners to explore these concepts on the go.
+
+### Developed and maintained by
+
+[Felipe Dalla Lana](https://www.lsu.edu/agriculture/plant/about/faculty-staff/lana.php)
+
+[Mladen Cucak](https://mladencucak.netlify.app/)
+
+[Paul D. Esker](https://plantpath.psu.edu/directory/pde6)
+
+### Contribute and share
+
+All contributions are welcome. Please get in touch if mistakes are spotted or if you want to contribute with materials.
+
+### Download materials
+
+All R scripts can be accessed [here](https://github.com/mladencucak/web_epidem/tree/main/r_files).
+
+### Funding
+
+The development of these materials was funded by projects:
+
+-   *Development and Validation of a Corn Disease Management Risk Assessment Tool to Improve Economic Decision-Making*, USDA-NIFA Award Number: 2019-68008-29900
+
+-   *Can You Spot It? Improving Management Recommendations in Wheat Using the Three "E\`s": Epidemiology, Extension, and Education*, USDA-NIFA Award Number: 2020-67013-31920
+
+[![PSU_logo](./figures/PSU_logo.png "PPEM website")](https://plantpath.psu.edu/)
