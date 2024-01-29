@@ -6,7 +6,7 @@ output:
     code_folding: show
     toc: true
     toc_float:
-      toc_depth: 3
+      toc_depth: 5
       collapsed: false
       smooth_scroll: false
 ---
@@ -129,7 +129,7 @@ inc
 
 # We calculate the variance in disease incidence
 var <- (inc* (1 - inc))/n_plants
-cv
+var
 # Note - R has a function for calculating variance, but it's important to see how it is calculated. 
 
 # We use the standard deviation (square root of the variance) and the mean to calculate the CV
@@ -140,7 +140,7 @@ cv
 
 In this example data set, we got a CV of 0.173 (17.3%). In plant pathology research, values between 0.1 and 0.2 (10% to 20%) are typically considered satisfactory.
 
-### **The index of dispersion**
+### **The index of dispersion (ID)**
 
 The index of dispersion (ID) is related to the CV. It is a ratio determined by the variance and mean. The distribution pattern of the data is important when interpreting the ID. In data that has a binomial distribution, an ID of less than 1 is considered ideal. 
 
@@ -148,12 +148,13 @@ The index of dispersion can be calculated by:
 
 ID = var^2^/mean
 
-We can use the previous example to show the calculation of an ID:
+**Example 1.2: We can use the previous example to show the calculation of an ID:**
 
 ```{r id_calc,class.source = 'fold-show'}
 
 # Use the variance (var) and mean (inc) to calculate the ID
 id <- (var^2)/inc
+id
 
 ```
 
@@ -165,20 +166,19 @@ Confidence intervals (CIs) represent the probability that a random observation w
 
 CI half width (95%) = 1.96 * var^1/2^
 
-**Example 1.2: Calculating the half width of the 95% CI**
+**Example 1.3: Calculating the half width of the 95% CI**
 
 We will use the previous example data to calculate the CI half-width. For this example, we will calculate the half-width of the CI that encompasses 95% of the data. Results that fall within half of this width are considered reliable. 
 
 ```{r half_width_calc,class.source = 'fold-show'}
 
 # Half-width of the required confidence interval
-1.96*sqrt(var) 
-
+halfCI <- 1.96*sqrt(var) 
+halfCI
 
 ```
 
 This means that for the incidence rate of 0.4 (40%) to be considered a reliable result, results from random re-sampling must fall within 0.4 $\pm$ 0.135 (13.5%). 
-
 
 ### **Finite population correction factor (FPC)**
 
@@ -191,7 +191,7 @@ FPC = ((N-n)/(N-1))^(1/2)^
 where N represents the total population and n represents the sampled population. The FPC is bounded between 0 and 1, and decreases as sampling efforts impact the remaining population. Typically, if the FPC is below 0.95 (95%), the size of the sampled individuals needs to be addressed. 
 
 
-**Example 2: Calculating the FPC by sampling effort in a population of 10,000**
+**Example 1.4: Calculating the FPC by sampling effort in a population of 10,000**
 
 In the next example, we are going to see how the number of individuals sampled impacts the FPC. The example population includes 10,000 individuals.  
 
@@ -216,6 +216,7 @@ ggplot(df, aes(prop, fpc)) +
 
 In the graph above, we can see that at smaller sampling ranges, the FPC remains close to 1. This means that the impact of sampling without replacement on the remaining population is negligible. However, the FPC drops below 0.95 when more than 10% of the population is being sampled without replacement. There are a number of methods to use if this becomes this case, such as sampling *with* replacement or by simply reducing your sampling effort. The choice of method will depend on the situation.
 
+**Note:** We will initially distribute the above calculations with data with a binomial distribution. This describes data with two outcomes, where the likelihood of each outcome is recorded. Keep in mind that the calculation and interpretation of these metrics may change based on the distribution of the data. 
 
 # **Sampling methods** 
 
@@ -228,6 +229,7 @@ Sampling bias example 1 - A researcher chooses not to select individuals from a 
 
 Sampling bias example 2: Although the researcher does not know it, a certain proportion of the field has been subjected to different environmental conditions. Random sampling improves the chances of collecting a representative number of individuals from that area of the field compared to the rest of the field. This way, the results of the experiment are less likely to attribute any variation in plants to the treatment when in reality they were due to the different field conditions. 
 
+
 ### **Simple random sampling (SRS)**
 
 Simple random sampling (SRS) is the most basic way to implement randomness in a sampling plan. Individuals at selected at random for collecting data, removing things that can introduce bias. 
@@ -237,7 +239,6 @@ For the following example, please imagine that we are sampling to determine what
 **Example 3: SRS for accurately sampling disease severity ** 
 
 In this example, we will sample randomly without replacement. This is because, as individuals are surveyed and removed from the population, the population doesn't not change significantly. We can use base R to obtain a list of randomly selected plants to sample. Then, we will find our resulting disease incidence and use the CV to see if our results are reliable. 
-
 
 ```{r srs, class.source = 'fold-show'}
 
@@ -250,22 +251,26 @@ head(pop)
 # We will use `set.seed()` to generate a pseudorandom number so that the class gets the same results. This is a great way to ensure that your work is reproducible while still getting randomly selected numbers later. The number you pick isn't important, but recording it is! 
 set.seed(1866844)
 
+# We will sample 25 plants
+n = 25
+
 # Use base R function `sample()` to pick specimens without replacement
-sampled.plants <- sample(pop$plant_id, 25, replace = FALSE)
+sampled.plants <- sample(pop$plant_id, n, replace = FALSE)
 
 # Create a data frame of only the sampled plants
 sampled.df <- pop[sampled.plants,]
 
-# Calculate the incidence of disease
-inc <- (sum(sampled.df$status)/25)
+# Calculate the incidence of disease in the sampled plants
+inc <- sum(sampled.df$status)/n
 inc
 
 # Calculate the variance
-var <- (inc * (1-inc))/nrow(sampled.df)
+var <- (inc * (1-inc))/n
+var
 
 # Calculate the CV 
 cv <- sqrt(var)/inc
-
+cv 
 
 ```
 
@@ -282,10 +287,10 @@ Let's see approximately how many samples we would need.
 ```{r srs_nsamples, class.source = 'fold-show'}
 
 # Calculate the number of samples needed
-n <- (1-inc)/(inc*0.1^2)
+n0 <- (1-inc)/(inc*0.1^2)
+n0
 
 ```
-
 
 We would need approx. 92 plants to get a CV of 10% or less. 
 
@@ -296,7 +301,7 @@ Cluster sampling is a method of sampling where sub-sections ("clusters") of the 
 
 Cluster sampling can be great when visiting each location in an experiment is costly, but the validity of the results are dependent on those clusters accurately representing the population. For plant pathology research, this often means that every treatment must be represented in every cluster. 
 
-**Example 4: Cluster sampling for disease severity**
+**Example 4.1: Cluster sampling for disease severity**
 
 In this example, we will imagine that we have an experiment consisting of 300 quadrants (20 x 15), with 10 plants each. The true value for the incidence of disease is 30%. We are interested in determining the incidence of disease, but we can't sample every quadrant. 
 
@@ -309,419 +314,291 @@ set.seed(8486)
 
 # Create normally distributed data showing how many plants are diseased in each quadrant
 field <- rbinom(n = 300, size = 10, prob = 0.30)
+head(field)
 
 # Provide the column and row of each quadrant in a data frame with the disease incidence
-field <- data.frame(rows = rep(1:20, times = 15),
+field1 <- data.frame(rows = rep(1:20, times = 15),
                     cols = rep(1:15, each = 20),
                     n.dis = field)
+head(field1)
 
 # Now we can plot our quadrants and show the number of plants with disease in each
-ggplot(field, aes(x = cols, y = rows, color = n.dis, 
+ggplot(field1, aes(x = cols, y = rows, color = n.dis, 
                   label = as.character(n.dis))) +
   geom_point(size = 10, shape = 15) +
   geom_text(colour = "black") +
   scale_color_gradient("Number of infected plants",
                        low = "lightgreen", high = "orangered") +
-  theme_bw() + 
+  theme_bw() +
   theme(axis.title = element_blank(),
-        legend.position = "top", 
+        legend.position = "top",
         panel.background = element_rect(terrain.colors(5)[3]),
-        panel.grid.major = element_blank(), 
+        panel.grid.major = element_blank(),
         panel.grid.minor = element_blank()) +
   coord_equal()
 
 # Set seed 
-# set.seed(468468)
 set.seed(46846811)
 
-# Randomly pick 8 quadrants to sample
-sampled.plants <- sample(300, 10, replace = FALSE)
+# We will sample 10 quadrants with 10 plants each
+q = 10
+n = 100
+
+# Randomly pick 10 quadrants to sample
+sampled.plants <- sample(300, q, replace = FALSE)
+sampled.plants
 
 # Create a data frame with only sampled plants
-sampled.df <- field[sampled.plants,]
+sampled.df <- field1[sampled.plants,]
+sampled.df
 
-# Get sampled disease incidence rate 
-inc <- sum(sampled.df$n.dis)/(10*10)
+# Get the disease mean
+inc <- sum(sampled.df$n.dis)/n
+inc
 
-# Calculate the overall variance
-var <- (inc * (1-inc))/(10*10)
+# Calculate the variance
+var <- (inc * (1-inc))/n
+var
 
 # Calculate the CV 
 cv <- sqrt(var)/inc
+cv
 
-# Calculate the number of quadrants needed for CV of 10%
-n <- (1-inc)/(10*inc*0.2^2)
+# Calculate the number of plants needed for CV of 10%
+n0 <- (1-inc)/(inc*0.1^2)
+n0
+
+# Calculate the number of quadrants we would need (rounded up)
+q0 <- ceiling(n0/10)
+q0
 
 # Calculate the ID
+id <- (var^2)/inc
+id
 
 ```
 
 
-## **Cluster sampling for disease incidence**
+To demonstrate the differences in reliability metrics based on data distribution, we will consider a similar example. In this example,  the data is 'overdispersed'. Data is considered over-dispersed when the variance of the response (the variable we are collecting data on) is greater than what is assumed in the model. 
 
-This code, when copied and pasted, will duplicate the information needed to replicate the example in the notes pertaining to cluster sampling for disease incidence data:
+To create this example data, we will introduce a new element: \$\theta. This is the 'overdispersion parameter'. It will impact two of arguments we'll use to create the example data, shape1 and shape2. 
 
--   Number of quadrants = 300
--   Probability of success (i.e., disease) = 0.35
--   theta \$\theta = overdispersion parameter, which is connected to shape1 and shape2 parameters
+**Example 4.2: An example in overdispersed data**
 
-Note: this distribution is rather flexible and takes on many different forms depending on the parameters, for our illustration, emphasis will be placed on generating an over-dispersed example to illustrate the calculations. Here, prob=0.35 represent the probability a given plant would be infected, based on Bernoulli trials and subsequently the beta-distribution
+To demonstrate the differences in reliability metrics based on data distribution, we will consider an almost-identical example. In this example,  the data is 'overdispersed'. Data is considered over-dispersed when the variance of the response (the variable we are collecting data on) is greater than what is assumed in the model. 
 
-```{r}
-set.seed(10000)
-field2<-rbetabinom(n=300, prob=0.35, size=10, shape1=0.2, shape2=2)
+To create this example data, we will introduce a new element: \$\theta. This is the 'overdispersion parameter'. It will impact two of arguments we'll use to create the example data, shape1 and shape2. 
 
-field2.matrix<-matrix(field2,nrow=15,ncol=20)
-field2.matrix
+```{r srs_overdisp, class.source = 'fold-show'}
 
-map1_long <- 
-  reshape2::melt(field2.matrix, varnames = c("rows", "cols")) 
-# See first rows onf melted matrix
-head(map1_long)
-point_size <- 11
-map1_long %>% 
-  ggplot(aes(factor(cols), factor(rows), 
-             color = value,
-             label = as.character(value)))+
-  geom_point(size = point_size, shape = 15)+
-  geom_text(colour = "black")+
-  scale_color_gradient("Health status (counts of infected plants):",
-                       low = "lightgreen", high = "#993300")+
-  theme_bw()+
+# Use set.seed() for reproducibility
+set.seed(8486)
+
+# Create normally distributed data showing how many plants are diseased in each quadrant
+field <- rbetabinom(300, prob = 0.30, size = 10,
+                    shape1 = 0.2, shape2 = 2)
+head(field)
+
+# Provide the column and row of each quadrant in a data frame with the disease incidence
+field1 <- data.frame(rows = rep(1:20, times = 15),
+                    cols = rep(1:15, each = 20),
+                    n.dis = field)
+head(field1)
+
+# Now we can plot our quadrants and show the number of plants with disease in each
+ggplot(field1, aes(x = cols, y = rows, color = n.dis, 
+                  label = as.character(n.dis))) +
+  geom_point(size = 10, shape = 15) +
+  geom_text(colour = "black") +
+  scale_color_gradient("Number of infected plants",
+                       low = "lightgreen", high = "orangered") +
+  theme_bw() +
   theme(axis.title = element_blank(),
         legend.position = "top",
         panel.background = element_rect(terrain.colors(5)[3]),
-        panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
   coord_equal()
+
+# Set seed 
+set.seed(46846811)
+
+# We will sample 10 quadrants with 10 plants each
+q = 10
+n = 100
+
+# Randomly pick 10 quadrants to sample
+sampled.plants <- sample(300, q, replace = FALSE)
+sampled.plants
+
+# Create a data frame with only sampled plants
+sampled.df <- field1[sampled.plants,]
+sampled.df
+
+# Get the disease mean
+inc <- sum(sampled.df$n.dis)/n
+inc
+
+# Calculate the variance
+var <- (inc * (1-inc))/n
+var
+
+# Calculate the CV 
+cv <- sqrt(var)/inc
+cv
+
+# Calculate the number of plants needed for CV of 10%
+n0 <- (1-inc)/(inc*0.1^2)
+n0
+
+# Calculate the number of quadrants we would need (rounded up)
+q0 <- ceiling(n0/10)
+
+# Calculate the ID
+id <- (var^2)/inc
+id
+
 ```
 
-Generate a sample of size 25 that represents the pilot study.
+We got very different values compared to Example 4.1. The distribution of this data meant that, in order to get a CV of 0.1, we would have had to sample more quadrants than we have. In reality, this kind of distribution is rare, but it's good to think about what these values mean in different contexts. 
 
-```{r}
-set.seed(602)
-field2.sample<-sample(x=field2, size=25)
-field2.sample
+### **Stratified sampling: Combining cluster and simple random sampling**
+
+So far, we have implemented randomness in determining which quadrants to sample in a clustered sampling regime. We can add simple random sampling *within* each quadrant for a multi-phase sampling approach. This might be appropriate when quadrants are large, or sampling resources are restrictive. 
+
+**Example 4.3: Combining clustered and random sampling**
+
+For this example, we will modify the situation in Example 4.1 - the example with cluster sampling and data *without* overdispersion. The difference will be in the number of plants per quadrant (n). The number of plants in each cluster will be 100. Instead of sampling 100 plants (10 quadrants, 10 plants each), you would be sampling 1000 plants (10 quadrants, 100 plants each). 
+
+Let's imagine that we don't have the resources to sample that many plants. How do we choose plants to sample in each quadrant in a way that manages bias? The answer is by using a simple random sampling technique within each quadrant. 
+
+````{r stratified, class.source = 'fold-show'}
+
+# First, we'll create data with quadrant ID and disease status (diseased or un-diseased) for # each plant. We will need quad and plant to be characters later on, so we'll change them #now.
+field <- data.frame(quad = as.character(rep(1:300, each = 100)),
+                    plant = as.character(rep(1:100, times = 300))) %>%
+                    mutate(dis = sample(c(0,1), n(), 
+                                  replace = TRUE, 
+                                  prob = c((1-0.3), 0.3)))
+            
+# Set seed 
+set.seed(46846811)
+
+# Randomly pick 10 quadrants to sample
+quads <- sample(300, 10, replace = FALSE) 
+quads
+
+# Randomly pick 10 plants out of every quadrant
+set.seed(45)
+plants <- sample(100, 10, replace = FALSE)
+
+# We'll subset the data to only include plants we will sample
+field1 <- field[which(field$quad == quads[1] | field$quad == quads[2] |
+                      field$quad == quads[3] | field$quad == quads[4] |
+                      field$quad == quads[5] | field$quad == quads[6] |
+                      field$quad == quads[7] | field$quad == quads[8] |
+                      field$quad == quads[9] | field$quad == quads[10]),]
+field2 <- field1[which(field1$plant == plants[1] | field1$plant == plants[2] |
+                      field1$plant == plants[3] | field1$plant == plants[4] |
+                      field1$plant == plants[5] | field1$plant == plants[6] |
+                      field1$plant == plants[7] | field1$plant == plants[8] |
+                      field1$plant == plants[9] | field1$plant == plants[10]),]
+                      
+# Calculate the mean disease occurrence (inc)
+inc <- sum(field2$dis)/100
+inc
+
+# Variance
+var <- (inc * (1-inc))/100
+var
+
+# CV 
+cv <- sqrt(var)/inc
+
 ```
 
-<!-- ## Calculations for mean, variance, and variance based on binomial distribution -->
+This combined sampling regime resulted in a respectable CV of 0.139, and we only had to sample 100 plants. 
 
-<!-- First, let's calculate disease incidence as a proportion followed by a comparison of the variances -->
+We can now introduce the concept of the **design effect** ('deff'). This is an estimate of the precision lost or gained through use of stratified sampling. Essentially, it is the ratio of of the variance from the stratified sampling plan (in the previous example, clustered sampling with random sampling within clusters), to the variance you would get from simple random sampling alone. We'll touch on this concept more when talking about experimental design, but know that the design effect can be useful in determining how to allocate your sampling units between stratified sampling layers. 
 
-<!-- ```{r} -->
-<!-- field2.sampleB<-field2.sample/10 -->
-<!-- field2.mean<-mean(field2.sampleB) -->
-<!-- field2.var<-var(field2.sampleB) #Variance based on normal distribution -->
-<!-- field2.varbin<-(field2.mean*(1-field2.mean))/10 -->
-<!-- ``` -->
+We will show how knowledge of the design effect can impact the samples you will need to collect. We will assume we already know the value for deff from pilot studies.
 
-<!-- Index of dispersion (D) -->
+```{r deff, class.source = 'fold-show'}
 
-<!-- ```{r} -->
-<!-- var.relation<-field2.var/field2.varbin -->
-<!-- ``` -->
+# Define deff
+deff = 2.54
 
-<!-- Question: What does index of dispersion stand for? -->
+# Calculate how deff will impact the number of samples needed for a CV of 0.1
+N <- ((1-inc)*deff)/(10*inc*0.1^2)
+N
 
-<!-- ```{r} -->
-<!-- N1<-(1-field1.mean)/(10*field1.mean*0.1^2) -->
-<!-- N1 -->
+```
 
-<!-- N2<-(1-field1.mean)/(10*field1.mean*0.2^2) -->
-<!-- N2 -->
-<!-- ``` -->
+# **Determining sample size based on incomplete knowledge**
 
-<!-- Exercise: Draw a new sample of 25 and run the same calculations to determine new sample sizes based on CV = 0.1 and CV = 0.2\ -->
-<!-- Hint: `set.seed()` -->
+So far, we have used the variance, mean, and population size to calculate necessary sample size (n) to get a certain value of CV. In the real world, you may not always have these variables. When the unknown variable is population size, you need to consider whether sampling with replacement is necessary. We'll talk about how to proceed when different variables are missing. 
 
-<!-- ## Sample Size Calculations 1 -->
+### **Determining sample size without the mean**
 
-<!-- Based on previous knowledge of the Power law relationship, values were calculated to represent to two parameters, A and B (see Madden et al. for more details) Parameters: A=16; B=1.4 -->
+In many cases, we may find ourselves without knowledge of the mean, especially when we're deciding how intensively to sample. In this case, we can estimate the mean with minimal effort and then create a plan for our full sampling effort. 
 
-<!-- ```{r} -->
-<!-- N1<-(1-field1.mean)/(10*field1.mean*0.1^2) -->
-<!-- N1 -->
+**Example 5.1: Calculating n without the mean**
 
-<!-- N2<-(1-field1.mean)/(10*field1.mean*0.2^2) -->
-<!-- N2 -->
-<!-- ``` -->
+```{r n_wo_mean, class.source = 'fold-show'}
 
-<!-- Define parameters: -->
+# Let's create some example data
+pop <- data.frame(plant_id = 1:1000) %>%
+  mutate(status = sample(c(0, 1), n(),
+                        replace = TRUE, prob = c((1-0.65), 0.65)))
+head(pop)
 
-<!-- ```{r} -->
-<!-- A<-16 -->
-<!-- B<-1.4 -->
-<!-- CV1 <- .1 -->
-<!-- CV2 <- .2 -->
-<!-- ``` -->
+# Set seed
+set.seed(746814)
 
-<!-- Calculate the sample size. -->
+# Randomly select 10 samples
+sampled.plants <- sample(pop$plant_id, 10, replace = FALSE)
 
-<!-- ```{r} -->
-<!-- (N.power1<-(A*field2.mean^(B-2)*(1-field2.mean)^B)/(10^B*CV1^2)) -->
-<!-- (N.power2<-(A*field2.mean^(B-2)*(1-field2.mean)^B)/(10^B*CV2^2)) -->
-<!-- ``` -->
+# Subset the selected plants
+sampled.df <- pop[sampled.plants,]
 
-<!-- ## Sample Size Calculations 2 -->
+# Calculate the mean of these 10 samples
+approx.inc <- mean(sampled.df$status)
+approx.inc
 
-<!-- Based on design effect (deff) and the beta-binomial distribution calculations. We use here the var.relation to represent the empirical heterogeneity factor (deff) -->
+# Use the estimated mean to estimate the variance
+var <- (approx.inc*(1-approx.inc))/(10)
+var
 
-<!-- ```{r} -->
-<!-- deff = 2.54 -->
-<!-- CV1 <- .1 -->
-<!-- CV2 <- .2 -->
+# Now we can create a 95% CI to see the range that the population mean falls in
+lower.bound <- approx.inc - 0.98*sqrt(var) 
+upper.bound <- approx.inc + 0.98*sqrt(var)
 
-<!-- N.betabinom1 <- ((1 - field2.mean) * deff) / (10 * field2.mean * CV1 ^ 2) -->
-<!-- N.betabinom2 <- ((1 - field2.mean) * deff) / (10 * field2.mean * CV2 ^ 2) -->
-<!-- ``` -->
+# And then proceed to calculate n normally
+n <- (1-inc)/(inc*0.1^2)
+n
+
+```
+
+By examining the scores of only a few plants, we improved our estimation of the mean and determined how many plants we would need to sample. 
 
 
+**Example 5.2: Calculating n without the population size (N)**
 
+For estimations where the population size is not known, we can use the mean (inc), variance, the margin of error (MOE), and the Z score. 
 
+```{r n_wo_pop, class.source='fold-show'}
 
+# Define inc and var
+inc <- 0.3
+var <- .002
 
-<!-- ## Based on PROPORTION OF MEAN, H, where M(population size) is NOT defined -->
+# Estimate the margin of error within 2 standard deviations of the mean
+moe <- 1.96*sqrt(var)
+moe
 
-<!-- ```{r func2} -->
-<!-- SRS.PROPORTION.1 <- function (mean,z,H) { -->
-<!--   Nest<-((1-mean)/mean)*(z/H)^2 -->
-<!--   names(Nest)<-"SampleSize" -->
-<!--   return(Nest) -->
-<!-- } -->
+# Estimate n 
+n <- (1.96*inc*(1-inc))/moe^2
+n
 
-<!-- ``` -->
+```
 
-<!-- ```{r plotlyplot2, fig.width=6, fig.height=5} -->
-<!-- gg <- -->
-<!--   as.data.frame(expand.grid( -->
-<!--     mean = seq(.05, .3, .05), -->
-<!--     z = 1.96, -->
-<!--     H =  seq(.1, .5, .05) -->
-<!--   )) %>% -->
-<!--   mutate(SampleSize = SRS.PROPORTION.1(mean, z, H)) %>% -->
-<!--   ggplot(aes(H, SampleSize, group = mean, color = mean)) + -->
-<!--   geom_point(size = .5) + -->
-<!--   geom_line() + -->
-<!--   scale_color_viridis_c() + -->
-<!--   theme_bw() -->
-
-<!-- plotly::ggplotly(gg)  -->
-<!-- ``` -->
-
-<!-- ## Based on PROPORTION OF MEAN, H, where M (population size) is defined -->
-
-<!-- -   *M* = population size\ -->
-<!-- -   *mean* = mean disease incidence\ -->
-<!-- -   *z* = desired value for Z (typically for our needs, 1.96 will suffice) -->
-<!-- -   *H* = a proportion of the mean, values from the literature range, empirically, from 0.1 to 0.5 -->
-
-<!-- ```{r func3} -->
-<!-- EstNfcf <- function (M,mean,z,H) { -->
-<!--   return(((1-mean)/mean)*(z/H)^2) -->
-<!-- } -->
-<!-- EstFcf <- function (M,mean,z,H) { -->
-<!--   Nest<-((1-mean)/mean)*(z/H)^2 -->
-<!--   finite <-Nest/M -->
-<!--   Nsample <-ifelse(finite>0.1,Nest/(1+(Nest/M)),Nest) -->
-<!--   return(round(Nsample,digits=1)) -->
-<!-- } -->
-<!-- NestM <- function (M,mean,z,H) { -->
-<!--   Nest <-((1-mean)/mean)*(z/H)^2 -->
-<!--   finite <-Nest/M -->
-<!--   return(round(finite, digits=2)) -->
-<!-- } -->
-
-<!-- ``` -->
-
-<!-- ```{r data_prep3, fig.width=9, fig.height=7.5} -->
-<!-- gg <-  -->
-<!--   as.data.frame(expand.grid( -->
-<!--     mean = seq(.05, .3, .05), -->
-<!--     z = 1.96,  -->
-<!--     H =  seq(.1,.5,.05), -->
-<!--     M =1000 -->
-<!--   ) ) %>%  -->
-<!--   mutate(  -->
-<!--     est_nfcf = EstNfcf(M,mean,z,H), -->
-<!--     est_fcf = EstFcf(M,mean,z,H), -->
-<!--     nest_m = NestM(M,mean,z,H) -->
-<!--   ) %>%  -->
-<!--   mutate("NEST/M" = nest_m , -->
-<!--          "Estimated-FCF" = est_fcf, -->
-<!--          "Estimated-NFCF" = est_nfcf) %>%  -->
-<!--   pivot_longer(cols = c("Estimated-NFCF", "Estimated-FCF", "NEST/M")) %>%  -->
-<!--   ggplot(aes(H, value, group = mean, color = mean))+ -->
-<!--   geom_point(size = .5)+ -->
-<!--   geom_line()+ -->
-<!--   scale_color_viridis_c()+ -->
-<!--   facet_wrap(~name, ncol = 1, scales = "free_y")+ -->
-<!--   theme_bw()+ -->
-<!--   theme(legend.position = "top") -->
-<!-- ``` -->
-
-<!-- ```{r plotlyplot3, fig.width=9, fig.height=7.5} -->
-<!-- plotly::ggplotly(gg) %>%  -->
-<!--   plotly::layout(legend = list(orientation = "h", x = 0.4, y = -0.2)) -->
-<!-- ``` -->
-
-<!-- # Based on Fixed positive number, h, where M IS NOT defined (population size) -->
-
-<!-- *h* represents the half length of a confidence interval based on a fixed positive number -->
-
-<!-- ```{r func4 } -->
-<!-- SRS.PROPORTION.1 <- function (mean,z,h) { -->
-<!--   Nest<-(mean*(1-mean))*(z/h)^2 -->
-<!--   names(Nest)<-"SampleSize" -->
-<!--   return(Nest) -->
-<!-- } -->
-<!-- ``` -->
-
-<!-- ```{r plotlyplot4, fig.width=6, fig.height=5} -->
-<!-- gg <-  -->
-<!-- as.data.frame(expand.grid( -->
-<!--   mean = seq(.05, .3, .05), -->
-<!--   z = 1.96,  -->
-<!--   h =  seq(.1,.5,.05) -->
-<!-- ) ) %>%  -->
-<!--   mutate(  -->
-<!--     SampleSize = SRS.PROPORTION.1(mean,z,h) -->
-<!--   ) %>%  -->
-<!--   ggplot(aes(h, SampleSize, group = mean, color = mean))+ -->
-<!--   geom_point(size = .5)+ -->
-<!--   geom_line()+ -->
-<!--   scale_color_viridis_c()+ -->
-<!--   theme_bw() -->
-
-<!-- plotly::ggplotly(gg)  -->
-<!-- ``` -->
-
-
-
-<!-- # CLUSTER SAMPLING FOR DISEASE INCIDENCE -->
-
-<!-- The following section has functions to calculate sample sizes based on Madden et al. (2007), table 10. Note, for the following, the finite population is not applied; this could be handled using direct calculations. Based on known number of sampling units, etc., or code could be modified accordingly. -->
-
-<!-- ## Based on CV -->
-
-<!-- -   *mean* = mean disease incidence\ -->
-<!-- -   *n* = number of individuals per sampling unit -->
-<!-- -   *CV* = coefficient of variation -->
-<!-- -   *N* = number of sampling units (e.g., quadrant) estimated based on outlined criteria -->
-
-<!-- ```{r func5} -->
-<!-- EstNfcf <- function (mean, n, CV, M) { -->
-<!--   return(round((1 - mean) / (n * mean * CV ^ 2), 2)) -->
-<!-- } -->
-<!-- EstFcf <- function (mean, n, CV, M) { -->
-<!--   Nest <- (1 - mean) / (n * mean * CV ^ 2) -->
-<!--   finite <- Nest / M -->
-<!--   Nsample <- ifelse(finite > 0.1, Nest / (1 + (Nest / M)), Nest) -->
-<!--   return(round(Nsample, digits = 1)) -->
-<!-- } -->
-<!-- NestM <- function (mean, n, CV, M) { -->
-<!--   Nest <- (1 - mean) / (n * mean * CV ^ 2) -->
-<!--   finite <- Nest / M -->
-<!--   return(round(finite, digits = 2)) -->
-<!-- } -->
-
-<!-- ``` -->
-
-<!-- ```{r data_prep5, fig.width=9, fig.height=7.5} -->
-<!-- gg <- -->
-<!-- as.data.frame(expand.grid( -->
-<!--   mean =seq(.1, .9, .1), -->
-<!--   n = 10, -->
-<!--   CV =seq(.05, .3, .01),  -->
-<!--   M =  c(100, 500, 1000) -->
-<!-- )) %>% -->
-<!--   mutate( -->
-<!--     est_nfcf = EstNfcf(mean, n, CV, M), -->
-<!--     est_fcf = EstFcf(mean, n, CV, M), -->
-<!--     nest_m = NestM(mean, n, CV, M) -->
-<!--   ) %>% -->
-<!--   mutate("NEST/M(X100)" = nest_m *100, -->
-<!--          "Estimated-FCF" = est_fcf, -->
-<!--          "Estimated-NFCF" = est_nfcf) %>%  -->
-<!--   pivot_longer(cols = c("Estimated-NFCF", "Estimated-FCF", "NEST/M(X100)")) %>%  -->
-<!--   ggplot(aes(CV, value, group = mean, color = mean))+ -->
-<!--   geom_point(size = .5)+ -->
-<!--   geom_line()+ -->
-<!--   scale_color_viridis_c()+ -->
-<!--   facet_grid(M~name)+ -->
-<!--   theme_bw()+ -->
-<!--   theme(legend.position = "top") -->
-<!-- ``` -->
-
-<!-- ```{r plotlyplot5, fig.width=9, fig.height=7.5} -->
-<!-- plotly::ggplotly(gg) %>%  -->
-<!--   plotly::layout(legend = list(orientation = "h", x = 0.4, y = -0.2)) -->
-<!-- ``` -->
-
-<!-- ## Based on proportion of mean, H -->
-
-<!-- -   *mean* = mean disease incidence\ -->
-<!-- -   *n* = number of individuals per sampling unit -->
-<!-- -   *z* = desired value for Z (typically for our needs, 1.96 will suffice) -->
-<!-- -   *H* = a proportion of the mean, values from the literature range, empirically, from 0.1 to 0.5 -->
-
-<!-- ```{r func6} -->
-<!-- CLUSTER.RANDOM.2 <- function (mean, n, z, H) { -->
-<!--   Nest<-((1-mean)/(n*mean))*(z/H)^2 -->
-<!--   names(Nest)<-"SampleSize" -->
-<!--   return(Nest) -->
-<!-- } -->
-
-<!-- ``` -->
-
-<!-- ```{r plotlyplot6, fig.width=6, fig.height=5} -->
-<!-- gg <- -->
-<!--   as.data.frame(expand.grid( -->
-<!--     mean = seq(.05, .3, .05), -->
-<!--     n = 10, -->
-<!--     z = 1.96, -->
-<!--     H =  seq(.1, .5, .05) -->
-<!--   )) %>% -->
-<!--   mutate(SampleSize = CLUSTER.RANDOM.2(mean, n, z, H)) %>% -->
-<!--   ggplot(aes(H, SampleSize, group = mean, color = mean)) + -->
-<!--   geom_point(size = .5) + -->
-<!--   geom_line() + -->
-<!--   scale_color_viridis_c() + -->
-<!--   theme_bw() -->
-
-<!-- plotly::ggplotly(gg)  -->
-<!-- ``` -->
-
-<!-- ## Based on fixed positive number, H -->
-
-<!-- -   *mean* = mean disease incidence\ -->
-<!-- -   *n* = number of individuals per sampling unit -->
-<!-- -   *z* = desired value for Z (typically for our needs, 1.96 will suffice) -->
-<!-- -   *h* = half length of the confidence interval -->
-
-<!-- ```{r func7} -->
-<!-- CLUSTER.RANDOM.3 <- function(mean, n, z, h) { -->
-<!--   Nest <- ((mean * (1 - mean)) / n) * (z / h) ^ 2 -->
-<!--   names(Nest) <- "SampleSize" -->
-<!--   return(Nest) -->
-<!-- } -->
-
-<!-- ``` -->
-
-<!-- ```{r plotlyplot7, fig.width=6, fig.height=5} -->
-<!-- gg <-  -->
-<!-- as.data.frame(expand.grid( -->
-<!--   mean = seq(.05, .3, .05), -->
-<!--   n = 10, -->
-<!--   z = 1.96,  -->
-<!--   h =  seq(.01,.1,.01) -->
-<!-- ) ) %>%  -->
-<!--   mutate(  -->
-<!--     SampleSize = CLUSTER.RANDOM.3(mean,n, z,h) -->
-<!--   ) %>%  -->
-<!--   ggplot(aes(h, SampleSize, group = mean, color = mean))+ -->
-<!--   geom_point(size = .5)+ -->
-<!--   geom_line()+ -->
-<!--   scale_color_viridis_c()+ -->
-<!--   theme_bw() -->
-
-<!-- plotly::ggplotly(gg)  -->
-<!-- ``` -->
