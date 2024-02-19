@@ -1,29 +1,27 @@
----
-title: "Simulation of disease progress in space"
-author: "Mladen Cucak; Felipe Dalla Lana; Mauricio Serrano; Paul Esker, Miranda DePriest"
-output:
-  html_document:
-    code_folding: show
-    toc: true
-    toc_float:
-      toc_depth: 3
-      collapsed: false
-      smooth_scroll: false
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, eval = FALSE)
-```
-
-Resources: https://dept.stat.lsa.umich.edu/~jerrick/courses/stat701/notes/parallel.html 
-
-# **Introduction**
-
-Understanding how epidemics spread from their origin is a major part of plant pathology. The distribution of disease in the field can offer key insights on where the disease came from, the cause of the disease, and factors influencing its success. Additionally, the likelihood of an individual plant becoming infected can depend on its proximity to other infected individuals. In this lesson, we'll simulate the spread of a disease, showing how R can be used to understand this phenomenon. We will also explore the concept of parallel processing, a technique where independent operations are deployed to multiple processors (CPUs) to perform a computationally-extensive task in less time. We'll also learn how to apply a single function to a list of objects in Example 2. 
-
-First, we'll set up by loading in packages and reconciling conflicts between commands from different packages. 
-
-```{r libs}
+# ---
+# title: "Simulation of disease progress in space"
+# author: "Mladen Cucak; Felipe Dalla Lana; Mauricio Serrano; Paul Esker, Miranda DePriest"
+# output:
+#   html_document:
+#     code_folding: show
+#     toc: true
+#     toc_float:
+#       toc_depth: 3
+#       collapsed: false
+#       smooth_scroll: false
+# ---
+# 
+# ```{r setup, include=FALSE}
+# knitr::opts_chunk$set(echo = TRUE, warning = FALSE, eval = FALSE)
+# ```
+# 
+# # **Introduction**
+# 
+# Understanding how epidemics spread from their origin is a major part of plant pathology. The distribution of disease in the field can offer key insights on where the disease came from, the cause of the disease, and factors influencing its success. Additionally, the likelihood of an individual plant becoming infected can depend on its proximity to other infected individuals. In this lesson, we'll simulate the spread of a disease, showing how R can be used to understand this phenomenon. We will also explore the concept of parallel processing, a technique where independent operations are deployed to multiple processors (CPUs) to perform a computationally-extensive task in less time. We'll also learn how to apply a single function to a list of objects in Example 2. 
+# 
+# First, we'll set up by loading in packages and reconciling conflicts between commands from different packages. 
+# 
+# ```{r libs}
 
 list.of.packages <-
   c(
@@ -63,18 +61,18 @@ rm(list.of.packages, new.packages, packages_load)
    conflict_prefer("filter", "dplyr")
   conflict_prefer("select", "dplyr")
  
-
-```
-
-If you experience difficulties installing or loading packages, please see Lesson 1 - Intro to R. 
-
-# **Epidemic simulation: Dispersal**
-
-In this section, we'll use a simulation to explore concepts about disease dispersal. Our example data will contain three randomly positioned initial infections in a field divided into 10 rows and 10 columns. Initial infected status will be indicated by 1, indicating that one plant in that cluster is infected. Clusters with only healthy plants are represented by 0. 
-
-**Example 1: Creating spatial data**
-
-```{r}
+# 
+# ```
+# 
+# If you experience difficulties installing or loading packages, please see Lesson 1 - Intro to R. 
+# 
+# # **Epidemic simulation: Dispersal**
+# 
+# In this section, we'll use a simulation to explore concepts about disease dispersal. Our example data will contain three randomly positioned initial infections in a field divided into 10 rows and 10 columns. Initial infected status will be indicated by 1, indicating that one plant in that cluster is infected. Clusters with only healthy plants are represented by 0. 
+# 
+# **Example 1: Creating spatial data**
+# 
+# ```{r}
 
 # Create a matrix with values of 0 in 10 rows and 10 columns
 map1 <- matrix(0,10,10)
@@ -101,12 +99,12 @@ for (j in as.numeric(1:inf)){
 # Look at map1
 map1
 
-
-```
-
-Now we'll transform the data, using `reshape2::melt()` to do so. We'll also visualize the data. Since we'll be doing this for several examples in this lesson, we'll write both tasks into a function that we can easily apply repeatedly. 
-
-```{r PlotMat}
+# 
+# ```
+# 
+# Now we'll transform the data, using `reshape2::melt()` to do so. We'll also visualize the data. Since we'll be doing this for several examples in this lesson, we'll write both tasks into a function that we can easily apply repeatedly. 
+# 
+# ```{r PlotMat}
 
 # Define the function and its required input
 PlotMat <- function(data){
@@ -134,35 +132,35 @@ PlotMat <- function(data){
     coord_equal()
 }
 
-```
-
-Now we'll apply that to our data to transform it and get a plot.
-
-```{r}
+# ```
+# 
+# Now we'll apply that to our data to transform it and get a plot.
+# 
+# ```{r}
 
 # Transform and plot map1
 plot <- PlotMat(map1)
 plot + ggtitle("Generation 1")
-  
-```
-
-**Question**: The three infected plants are distant to each other, rather than existing in proximity. Would the distribution of infected plants tell you anything about the inoculum? 
-
-
-# **Proximal dispersal**
-
-In this example, we will simulate the spread of disease from infected individuals to adjacent plants. The pattern of simulated dispersion we will use is called 'the rook's move'. Just like the rook in chess, the disease can move directly forward, backward, left and right, but it never skips over direct neighbors to infect more distant plants. The spread of disease in this case is roughly *isotropic*, meaning that the magnitude of spread is equal in all directions. If it was perfectly isotropic, we would need to do distance calculations on diagonal neighbors.
-
-Example: If the infected plant is in cell [2,3], the following cells/plants will become infected: 
-*[4,2] - the plant in front of it
-*[2,2] - the plant behind it
-*[3,1] - the plant to the right
-*[3,3] - the plant to the left
-
-We'll manipulate the map1 object from the last example to fit this situation. A *for loop* is used to select each individual cell. A series of *if statements* are used to determine which of its neighbors will inherit its condition (healthy or infected). We'll follow the progression of the disease by simulating generations of reproduction and dispersal. 
-
-**Example 2.1: Simulating the proximal spread of disease in a generation**
-```{r}
+#   
+# ```
+# 
+# **Question**: The three infected plants are distant to each other, rather than existing in proximity. Would the distribution of infected plants tell you anything about the inoculum? 
+# 
+# 
+# # **Proximal dispersal**
+# 
+# In this example, we will simulate the spread of disease from infected individuals to adjacent plants. The pattern of simulated dispersion we will use is called 'the rook's move'. Just like the rook in chess, the disease can move directly forward, backward, left and right, but it never skips over direct neighbors to infect more distant plants. The spread of disease in this case is roughly *isotropic*, meaning that the magnitude of spread is equal in all directions. If it was perfectly isotropic, we would need to do distance calculations on diagonal neighbors.
+# 
+# Example: If the infected plant is in cell [2,3], the following cells/plants will become infected: 
+# *[4,2] - the plant in front of it
+# *[2,2] - the plant behind it
+# *[3,1] - the plant to the right
+# *[3,3] - the plant to the left
+# 
+# We'll manipulate the map1 object from the last example to fit this situation. A *for loop* is used to select each individual cell. A series of *if statements* are used to determine which of its neighbors will inherit its condition (healthy or infected). We'll follow the progression of the disease by simulating generations of reproduction and dispersal. 
+# 
+# **Example 2.1: Simulating the proximal spread of disease in a generation**
+# ```{r}
 
 # Create map2 by taking map1 and modifying it
 map2 <- map1
@@ -197,14 +195,14 @@ for(i in as.numeric(1:10)){
 }
 
 map2
-
-```
-
-If you need a refresher on for loops and if statements, visit Lessons 4 and 5 respectively. 
-
-Now we'll use `lapply()` to apply function `PlotMat` to a list of objects. The `lapply()` function from base R allows you to apply the same function to a list of objects. We'll use it to show the progress of the disease in map1 and map2. 
-
-```{r map1 vs map2}
+# 
+# ```
+# 
+# If you need a refresher on for loops and if statements, visit Lessons 4 and 5 respectively. 
+# 
+# Now we'll use `lapply()` to apply function `PlotMat` to a list of objects. The `lapply()` function from base R allows you to apply the same function to a list of objects. We'll use it to show the progress of the disease in map1 and map2. 
+# 
+# ```{r map1 vs map2}
 
 # First, let's see what lapply() does and what arguments it needs
 ?lapply()
@@ -216,16 +214,16 @@ lapply(list(map1,map2), PlotMat)
 # # Instead of doing this:
 # PlotMat(map1)
 # PlotMat(map2)
-
-```
-
-This is a simple example, but imagine if you had many map objects. It would be much easier to create a list and put it into `lapply()` than it would be to write a line for each object. 
-
-Now we can inspect the maps. You can see that each of the three originally infected plants have infected their closest neighbors, spreading the disease. The disease in the originally-infected clusters has also increased to two infected plants. We can continue the simulation through multiple generations (*n*) with the same techniques we've previously used.
-
-**Example 2.2: Simulating the proximal spread of disease through *n* generations**
-
-```{r prox_n}
+# 
+# ```
+# 
+# This is a simple example, but imagine if you had many map objects. It would be much easier to create a list and put it into `lapply()` than it would be to write a line for each object. 
+# 
+# Now we can inspect the maps. You can see that each of the three originally infected plants have infected their closest neighbors, spreading the disease. The disease in the originally-infected clusters has also increased to two infected plants. We can continue the simulation through multiple generations (*n*) with the same techniques we've previously used.
+# 
+# **Example 2.2: Simulating the proximal spread of disease through *n* generations**
+# 
+# ```{r prox_n}
 
 # Number of generations
 n <- 6
@@ -272,19 +270,19 @@ plot <- lapply(mapn, PlotMat)
 for (i in as.numeric(1:n)){
   print(plot[[i]] + ggtitle(paste0("Generation ", as.character(i))))
 }
-
-```
-
-Now we've seen how this simple pattern of dispersal can develop through space and time in an example field. We will move on to explore other types of dispersal in similar scenarios. 
-
-
-# **Exponential and random dispersal**
-
-Disease spread is does not always occur in a simple, step-wise pattern with clear limits to distance, like in the last example. In this simulation, the probability of infection is distributed exponentially with distance. Said differently, the chance of infection is highest for the infected plant's nearest neighbors, but infecting more distant plants is possible. 
-
-In this example, we have 1,000 rows, 1,000 columns, and 20 infected plants in generation 1. The rate of spread must also be defined, and it impacts the number of plants infected each generation.
-
-```{r example3.1}
+# 
+# ```
+# 
+# Now we've seen how this simple pattern of dispersal can develop through space and time in an example field. We will move on to explore other types of dispersal in similar scenarios. 
+# 
+# 
+# # **Exponential and random dispersal**
+# 
+# Disease spread is does not always occur in a simple, step-wise pattern with clear limits to distance, like in the last example. In this simulation, the probability of infection is distributed exponentially with distance. Said differently, the chance of infection is highest for the infected plant's nearest neighbors, but infecting more distant plants is possible. 
+# 
+# In this example, we have 1,000 rows, 1,000 columns, and 20 infected plants in generation 1. The rate of spread must also be defined, and it impacts the number of plants infected each generation.
+# 
+# ```{r example3.1}
 
 # Number of infected clusters in gen 1
 nstart <- 20
@@ -292,35 +290,35 @@ nstart <- 20
 # Rows and columns of infected plants
 row1 <- round(runif(n = nstart, min = 0, max = 1000))
 col1 <- round(runif(n = nstart, min = 0, max = 1000))
-
-```
-
-Now we have 20 infected clusters out of 1,000,000. We can see how the values of the next generation will be distributed based on the rate *r*. 
-
-```{r exp dis}
+# 
+# ```
+# 
+# Now we have 20 infected clusters out of 1,000,000. We can see how the values of the next generation will be distributed based on the rate *r*. 
+# 
+# ```{r exp dis}
 
 hist(rexp(n=1000, rate=2),col="blue",xlim =range(0:13), ylim = range(0:600))
 hist(rexp(n=1000, rate=1),col="blue",xlim =range(0:13), ylim = range(0:600))
 hist(rexp(n=1000, rate=0.5),col="blue", xlim =range(0:13), ylim = range(0:600))
 
 
-```
-
-We can see that a higher rate results in more strongly skewed value distribution. 
-
-As we continue with this example, the processing time will grow significantly. To reduce the processing time, we will use packages `pbapply` and `parallel`
-
-To continue with our example, we'll use all of the following parameters:
-
-- `nclust` is the number of individual clusters
-- `nstart` is the number of *initial* infections
-- `nnew` is the number of *new* infections in a generation 
-- `ngen` is the number of generations
-- `exrt` is the rate parameter for the exponential distribution
-
-We'll define parameters, create the initial data matrix, and then define a function for calculating the next generation. 
-
-```{r definitions}
+# ```
+# 
+# We can see that a higher rate results in more strongly skewed value distribution. 
+# 
+# As we continue with this example, the processing time will grow significantly. To reduce the processing time, we will use packages `pbapply` and `parallel`
+# 
+# To continue with our example, we'll use all of the following parameters:
+# 
+# - `nclust` is the number of individual clusters
+# - `nstart` is the number of *initial* infections
+# - `nnew` is the number of *new* infections in a generation 
+# - `ngen` is the number of generations
+# - `exrt` is the rate parameter for the exponential distribution
+# 
+# We'll define parameters, create the initial data matrix, and then define a function for calculating the next generation. 
+# 
+# ```{r definitions}
 
 # Define the following parameters
 ntot <- nstart
@@ -338,7 +336,7 @@ disperse2 <- function(nstart, nnew, ngen, exrt){
   coord <- matrix(runif(n=2*nstart, min=0, max=1000),
                   nrow=nstart, ncol=2)  
   
-  # ntot serves as a way to avoid changing nstart each generation
+  # ntot serves as a way to avoid changing nstart, a constant
   ntot <- nstart
   
   # For each generation
@@ -370,11 +368,11 @@ disperse2 <- function(nstart, nnew, ngen, exrt){
   coord
 }
 
-```
-
-Now, we're going to run the simulation with a variety of parameters to see how each influences the result. 
-
-```{r var combo}
+# ```
+# 
+# Now, we're going to run the simulation with a variety of parameters to see how each influences the result. 
+# 
+# ```{r var combo}
 
 # Create a data frame combining all possible combinations of rate and gen
 combos <- expand.grid(rate = c(0.05, 0.1, 0.5),
@@ -405,14 +403,14 @@ for (i in seq(1:nrow(combos))){
   print(i)
   print(Sys.time())
 }
-   
-```
 
-The above chunk of code probably took a while to run. On the computer this was developed on, it took 69 seconds. To run one more generation, it took XX minutes and XX seconds. Clearly, each additional parameter you want to test adds a lot more computational time. We'll now explore a way to speed this up.
 
-Normally, everything you do in your R session is done on one core (processing unit), although your device has more. It's possible to perform **parallel processing**, a computational method where tasks are deployed to multiple cores for faster processing. This is in contrast to **serial processing**, what we normally do with R, where a single task is followed by another. The only drawback is that each core must be able to work independently, and that you must leave at least one core free for the device to function. In R, you can use packages `pbapply` and `parallel` to enable parallel processing, and to provide all information each core needs.  
-
-```{r parallel}
+# 
+# ```
+# 
+# The above chunk of code probably took a while to run. Normally, everything you do in your R session is done on one core (processing unit) of your device. You can use packages `pbapply` and `parallel` to direct R to use multiple cores, or processing units. Normally, R uses a single core. The use of multiple cores to perform independent operations simultaneously is called **parallel processing**. Each core must have all of the relevant information to perform its operation. We will enable parallel processing now.
+# 
+# ```{r parallel}
 
 # Detect the number of cores available
 cores <- detectCores()
@@ -424,29 +422,10 @@ cores <- cores-1
 cl <- makeCluster(cores)
 
 # Export the relevant objects
-clusterExport(cl, c("combo_ls", "sim_ls", "disperse2", "nstart",    "nnew", "ngen", "exrt"))
+clusterExport(cl, c("combo_ls", "sim_ls", "disperse2"))
 
 # Export the relevant package(s) without generating feedback
 clusterEvalQ(cl, library("dplyr", quietly = TRUE, verbose = FALSE))
-
-# Record the start time
-start.time2 <- Sys.time()
-
-# Create list sim_ls with parallel processing
-sim_ls <- pblapply(combo_ls, function(x){
-  disperse2(nstart=20, nnew=10, 
-            ngen=x[,2], 
-            exrt= x[,1]) %>% 
-    as_tibble() %>% 
-    mutate(rates =paste0("rate = ", x[ ,1]),
-           ngen = paste0("gen = ", x[ ,2]))
-}, cl = cl)
-
-# Record the finish time
-end.time2 <- Sys.time()
-````
-
-On the computer this code was developed on, there were 16 cores and 15 were used for calculations. 
 
 
 

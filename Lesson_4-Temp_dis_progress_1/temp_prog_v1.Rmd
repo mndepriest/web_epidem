@@ -264,7 +264,7 @@ Let us begin by considering only the first rectangle. The width is the time betw
 # Calculate the area of rectangle 1
 
 # Get the width (time)
-w1 <- (sub.dta1$dai[1] + (sub.dta1$dai[1+1]))
+w1 <- ((sub.dta1$dai[1+1]) - sub.dta1$dai[1])
 w1
 
 # Get the height (the average proportion infected)
@@ -275,8 +275,8 @@ h1
 a1 <- w1*h1
 a1
 
-# This can be done in fewer steps:
-a1 <- (sub.dta1$dai[1] + (sub.dta1$dai[1+1]))*((sub.dta1$prop[1]+sub.dta1$prop[1+1])/2)
+# This can be done in fewer steps by combining the calculations w1 and h1:
+a1 <- ((sub.dta1$dai[1+1]) - sub.dta1$dai[1])*((sub.dta1$prop[1]+sub.dta1$prop[1+1])/2)
 a1
 
 ```
@@ -298,7 +298,7 @@ We’re going to illustrate how you can create a simple loop to calculate the ar
 for (i in as.numeric(1:3)){
   
   # Create an intermediate object, 'result', to save the area to. Use i to indicate which rows of data to get values from. 
-  result <- (sub.dta1$dai[i] + (sub.dta1$dai[i+1]))*((sub.dta1$prop[i]+sub.dta1$prop[i+1])/2)
+  result <- ((sub.dta1$dai[i+1]) - sub.dta1$dai[i])*((sub.dta1$prop[i]+sub.dta1$prop[i+1])/2)
   
   # Rename 'result' with a unique name using the assign() function. Use i to create the new object name. 
   assign(paste0("a",i), result)
@@ -316,7 +316,7 @@ areas <- numeric()
 # Run the loop
 for (i in as.numeric(1:3)){
   
-  result <- (sub.dta1$dai[i] + (sub.dta1$dai[i+1]))*((sub.dta1$prop[i]+sub.dta1$prop[i+1])/2)
+  result <- ((sub.dta1$dai[i+1]) - sub.dta1$dai[i])*((sub.dta1$prop[i]+sub.dta1$prop[i+1])/2)
   
   # Instead of using assign() to rename the result, just use append() to add it to the vector.
   areas <- append(areas, result)
@@ -373,7 +373,7 @@ AUDPC <- function(times, proportions) {
   # Calculate the area for each rectangle
     for (i in as.numeric(rectangles)){
     
-    result <- (times[i] + times[i+1])*((proportions[i]+proportions[i+1])/2)
+    result <- (times[i+1] - times[i])*((proportions[i]+proportions[i+1])/2)
     
     # Append the ith result to audpc_scores
     audpc_scores <- c(audpc_scores, result)
@@ -400,7 +400,7 @@ audpc1
 
 # Get the total AUDPC
 total1 <- sum(audpc1)
-
+total1
 ```
 
 We have the UADPC, or disease severity, of all time periods in the data. We can see that the disease severity started increasing slightly at the beginning, and then increased more rapidly in the final time periods.
@@ -465,9 +465,14 @@ total2
 
 # Print audpc1 and total1 to compare
 audpc1
-
 total1
 
+# To compare the standardized AUDPC (taking into account that the assessment periods were different)
+# This approximately tells us something about the daily increase in development based on small rectangles
+raudpc2 <- total2/(max(dta2$dai)-min(dta2$dai))
+raudpc1 <- total1/(max(dta1$dai)-min(dta1$dai))
+
+print(cbind(total1, raudpc1, total2, raudpc2))
 ```
 
 The AUDPC for data set 1 was higher than that of data set 2. Does this necessarily mean that dta1 was a more ‘severe’ disease than dta2? Under which circumstances would the answer be yes, or no?
