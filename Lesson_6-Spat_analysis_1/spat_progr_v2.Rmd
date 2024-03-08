@@ -11,11 +11,6 @@ output:
       smooth_scroll: false
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, eval = FALSE)
-```
-
-Resources: https://dept.stat.lsa.umich.edu/~jerrick/courses/stat701/notes/parallel.html 
 
 # **Introduction**
 
@@ -207,7 +202,7 @@ Now we'll use `lapply()` to apply function `PlotMat` to a list of objects. The `
 ```{r map1 vs map2}
 
 # First, let's see what lapply() does and what arguments it needs
-?lapply()
+# ?lapply()
 # Remember - you can do the same thing by placing your cursor on the command and pressing F1
 
 # We create and provide the list (map1 and map2) and lapply applies PlotMap
@@ -378,7 +373,7 @@ Now, we're going to run the simulation with a variety of parameters to see how e
 
 # Create a data frame combining all possible combinations of rate and gen
 combos <- expand.grid(rate = c(0.05, 0.1, 0.5),
-                      gen = c(1, 2, 3, 4, 5))
+                      gen = c(1, 2, 3, 4))
 combos
 
 # We'll use our function disperse2() to run each combination of rate and gen, and store the results in a list, sim_ls:
@@ -396,23 +391,29 @@ for (i in seq(1:nrow(combos))){
   sim_ls[[i]] <- disperse2(nstart = 20, nnew = 10, 
                            ngen = combos[i,2],
                            exrt = combos[i,1]) %>%
+    
     # Converted into a tibble/type of data frame with columns 'rate = #' and 'gen = #'
     as_tibble() %>% 
     mutate(rates = paste0("rate = ", combos[i,1]),
            ngen = paste0("gen = ", combos[i,2]))
-  
-  # Print the result and the time
-  print(i)
-  print(Sys.time())
 }
+
+# Record the end time
+end.time <- Sys.time()
+
+# Let's see how long it took
+end.time - start.time
    
 ```
 
-The above chunk of code probably took a while to run. On the computer this was developed on, it took 69 seconds. To run one more generation, it took XX minutes and XX seconds. Clearly, each additional parameter you want to test adds a lot more computational time. We'll now explore a way to speed this up.
+The above chunk of code probably took a while to run. On the computer this was developed on, it took 69 seconds. To run one more generation, it took 30 minutes. We can use a new technique to speed this process up. 
 
 Normally, everything you do in your R session is done on one core (processing unit), although your device has more. It's possible to perform **parallel processing**, a computational method where tasks are deployed to multiple cores for faster processing. This is in contrast to **serial processing**, what we normally do with R, where a single task is followed by another. The only drawback is that each core must be able to work independently, and that you must leave at least one core free for the device to function. In R, you can use packages `pbapply` and `parallel` to enable parallel processing, and to provide all information each core needs.  
 
 ```{r parallel}
+
+# Turn the combos data frame into a list
+combo_ls <- split(combos, 1:nrow(combos))
 
 # Detect the number of cores available
 cores <- detectCores()
@@ -424,10 +425,10 @@ cores <- cores-1
 cl <- makeCluster(cores)
 
 # Export the relevant objects
-clusterExport(cl, c("combo_ls", "sim_ls", "disperse2", "nstart",    "nnew", "ngen", "exrt"))
+clusterExport(cl, c("combo_ls", "sim_ls", "disperse2", "nstart", "nnew", "ngen", "exrt"))
 
-# Export the relevant package(s) without generating feedback
-clusterEvalQ(cl, library("dplyr", quietly = TRUE, verbose = FALSE))
+# Export the relevant package(s) 
+clusterEvalQ(cl, library("dplyr", quietly = TRUE))
 
 # Record the start time
 start.time2 <- Sys.time()
@@ -444,14 +445,57 @@ sim_ls <- pblapply(combo_ls, function(x){
 
 # Record the finish time
 end.time2 <- Sys.time()
-````
 
-On the computer this code was developed on, there were 16 cores and 15 were used for calculations. 
+# See how much time it took
+start.time2 - end.time2
+
+```
+
+On the computer this code was developed on, there were 16 cores and 15 were used for calculations. It took less than a minute to run - much better than when calculations were done sequentially on a single core. 
+
+You probably noticed a bunch of warnings too. After setting up a task for multiple cores, you need to close the connection to them or it may cause problems. We'll do that now. 
+
+```{r, eval= FALSE}
+
+stopCluster(cl)
+
+```
+
+We should also save the results immediately after generating them. This way, if something happens and the R session ends, we don't have to perform those calculations over again. 
+
+```{r, eval= FALSE}
+
+# Save the results
+saveRDS(sim_ls, here::here("simulation.rds"))
+
+```
+
+The advantages of parallel processing are apparent, but you can see how it can speed even more intensive computation by adding more combinations to object `combos` for yourself. 
+
+Now we will explore the data we generated to see how the development of an epidemic depends on the rate of spread. 
+
+```{r final_plot, out.width= "100%"}
+
+# Create a plot 'p' by taking sim_ls
+sim_df <- sim_ls %>% 
+  # formatting it as a table
+  bind_rows() %>%
+  # and then converting it into a data frame
+  data.frame()
+  
+# and creating a ggplot object 
+ggplot(sim_df, aes(newx, newy))+
+  ylim(0,1000)+
+  xlim(0,1000)+
+  geom_point(size = .3)+
+  facet_grid(rates~ngen)+
+  theme_bw()+
+  xlab("East-West")+
+  ylab("South-North")+
+  coord_equal()
 
 
-
-
-
+```
 
 
 
