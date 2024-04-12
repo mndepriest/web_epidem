@@ -1,0 +1,725 @@
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+---
+title: "**Introduction to Experimental Design**"
+author: "Felipe Dalla Lana; Mladen Cucak; Mauricio Serrano; Paul Esker, Miranda DePriest"
+date: "4/11/2024"
+output:
+  html_document:
+    code_folding: show
+    toc: true
+    toc_float:
+      toc_depth: 3
+      collapsed: true
+      smooth_scroll: false
+editor_options: 
+  chunk_output_type: console
+---
+
+## **Introduction**
+
+Properly designed experiments can advance the frontier of plant pathology research. However, poorly planned experimental designs can result in weak results and poor interpretative value, as well as a waste of time and resources. 
+
+When designing an experiment, the key objectives are minimizing bias and ensuring the reproducibility of the work. It is important to think about the analyses you will want to do with the results before setting the experiment up. Otherwise, the results may not address the questions they were meant to. 
+
+In this section, we will illustrate and discuss some of the experimental methods and techniques often used in plant epidemiology studies such as the use of multiple replicates, block designs, multi-factorial designs, and correcting for multiple hypothesis testing. We will also show the use of R package `agricolae` for experimental randomization. 
+
+Before running the first example, we'll load in the necessary packages. 
+
+```{r packages}
+
+library(tidyverse)
+library(agricolae) # For randomization
+library(ggsci) 
+library(psych)
+library(car)
+library(emmeans)
+library(RColorBrewer)
+
+```
+
+## **Basic Experimental Design**
+
+### **Randomization**
+
+Randomization is a powerful tool used to reduce bias in agricultural studies. When paired with the use of multiple replicates, randomization can significantly reduce the effect of non-treatment environmental variation, like uneven shading or elevation patterns, or increased wind pressure along the edges of plots. 
+
+### **Completely Randomized Design (CRD)**
+
+The most simple experimental design is the **Completely Randomized Design (CRD)**. With this method, we assume the conditions across space (e.g., within a field) are completely homogeneous. Experimental subjects (e.g., individual plants or experimental units) are assigned locations (e.g., plots within a field or locale) completely randomly, and with no constraints. 
+
+Although our assumption of spatial homogeneity is rarely, if ever, fulfilled, this experimental design still strongly controls for heterogeneity. The likelihood of most or all subjects receiving a certain treatment being located within the same group of locations is relatively low. This allows us to untangle the impact of the treatment versus the impacts of environmental heterogeneity. An example of using a completely randomized design is shown next on some example data. 
+
+For this example, we have *6 treatments* represented from letters A-F. We also have *5 replicates* of each treatment, giving us 30 experimental units in total. We can lay out our treatments in order, but this isn't the best way. The goal of our experiment is to see the impact of the treatment on the experimental unit, *not* the impact of uneven shading across treatments. 
+ 
+To prevent bias from environmental heterogeneity, we can use a CRD in our experiment. By randomizing the location of each experimental unit, we can decrease the likelihood of mistaking effects of a different environment with the effects of the treatment. Because treatments are randomly assigned to plots, it's very unlikely that most or all replicates of a single treatment are subjected to a different environment. 
+
+We can use `design.crd()` from the `agricolae` package (with documentation [here](https://cran.r-project.org/web/packages/agricolae/agricolae.pdf)) to assign our treatments to plots 1-30 in a CRD.  
+
+```{r}
+
+# Create the treatments
+trt<- LETTERS[1:6] 
+
+# Design a CRD with our treatments, 5 replicates, and as many plots as there are experimental units. 
+# We also define seed number so that the same random plot assignment can be reproduced. 
+CRD <- design.crd(trt=trt, r=5, serie=0, seed=09041909)
+
+# View the example data
+CRD$book
+
+```
+
+Now each of our 30 experimental units are randomly assigned to one of *30 plots*. We can visualize this layout by first transforming object `CRD` to reflect row and column location. In this example, we will assume that our plots are arranged in 6 columns and 5 rows. 
+
+```{r, fig.align = "center", fig.height = 5, fig.width = 9, class.source='fold-show'}
+ 
+# Assign 6 repetitions of numbers 1-5 to the new column 'row'.
+# Then assign 5 repetitions of numbers 1-6 to new column 'column'.  
+CRD_layout <-  CRD$book %>% 
+       mutate(row = rep(1:5, each=6),
+              column = rep(1:6, 5))
+
+# Create 'id' column that identifies each experimental unit by treatment and replicate
+CRD_layout$r <- as.character(CRD_layout$r)
+CRD_layout$id <- paste(CRD_layout$trt,CRD_layout$r,sep="")
+
+# View
+head(CRD_layout)
+
+ggplot(CRD_layout, aes(y=row, x = column)) + 
+   geom_tile(aes(fill=trt), width=.95, height=0.95, color = "black", linewidth = 0.5) +
+   geom_label(aes(label = paste("Plot",plots,sep=" ")), size = 3.5, nudge_x = -0.1, nudge_y = 0.3) +
+  geom_label(aes(label = id), size = 7) + 
+
+   scale_y_reverse(expand = c(0.01,.01), breaks = 1:5) +
+   scale_x_continuous(expand = c(0.01,0.01), breaks = 1:6) +
+   scale_fill_npg() +
+   labs(x="Plot columns", y="Plot rows", fill = "Treatments", 
+        title = "Plot assignment for a completely randomized experimental design (CRD)",
+        subtitle = "Six treatments with five replicates each are randomly assigned plot locations within a field",
+        caption = "Plot letter indicates treatment type, number indicates replicate. E.g., E1 refers to the first replicate of treatment E") +
+   
+   theme(
+     panel.background = element_blank(),
+     axis.text = element_text(size=rel(1), color="black"),
+     axis.title = element_text(size=rel(1), color="black",face="bold"),
+     plot.title = element_text(size=rel(2), color="black", face = "bold"),
+     plot.subtitle = element_text(size=rel(1.2), color="black"),
+     legend.title = element_text(size=rel(1.3), color="black", face = "bold"),
+     legend.text = element_text(size = rel(1.2)),
+     legend.justification = "top" )
+
+```
+
+Now we have a map detailing where each experimental unit goes in a completely randomized design.
+
+### **Randomized Complete Block Design (RCBD)**
+
+In a Randomized Complete Block Design (RCBD), we constrain randomization within blocks. When we do this, we assume that conditions within a block are homogeneous, but that conditions *between* different blocks are not. Because of this, we randomly assign treatments *within* blocks. This ensures that no single treatment is impacted by heterogeneous conditions at a location, and that there is a representative from each treatment at each location, experiencing the same environmental conditions.  
+
+First, we'll create example data. In this data, we have *6 treatments* represented by letters A-F, *4 replicates* of each treatment, and *4 unique blocks/locations*. Within each block, we have a number representing each of the *6 plots within each block* (for a total of 24 individual plots). We will also set the seed number so that your example data is identical to ours. 
+
+```{r rcbd}
+
+# Create the example data
+trt <- LETTERS[1:6]
+RCBD <- design.rcbd(trt, r=4, serie=0, seed=09041909)
+RCBD
+
+# Create rows and columns 
+RCBD_layout <-  RCBD$book %>% 
+       mutate(row = block, column = rep(1:6, 4))
+
+# Modify RCBD data to reflect full plot names as ids
+RCBD_layout$plots <- substring(RCBD_layout$plots, 2) %>%     as.character(RCBD_layout$plots)
+RCBD_layout$id <- paste(RCBD_layout$trt,RCBD_layout$block,sep = "")
+
+
+# Visualize RCBD design 
+ggplot(RCBD_layout, aes(y=row, x = column)) + 
+   geom_blank()+
+    
+   geom_rect(aes(xmin=.4,xmax=6.6,ymin=3.5,ymax=4.5),fill="#ff073a",color="black") + # Block 1
+   geom_rect(aes(xmin=.4,xmax=6.6,ymin=2.5,ymax=3.5),fill="#42f940",color="black") + # Block 2
+   geom_rect(aes(xmin=.4,xmax=6.6,ymin=1.5,ymax=2.5),fill="#d9ff0e",color="black") + # Block 3
+   geom_rect(aes(xmin=.4,xmax=6.6,ymin=0.5,ymax=1.5),fill="#b919fc",color="black") + # Block 4
+    
+   geom_tile(aes(fill=trt), width=.95, height=0.80, color = "black", size = 1)+
+   geom_label(aes(label = id), size = 8) + 
+
+   scale_y_discrete(expand = c(0.1,.01), limits = rev) +
+   scale_x_continuous(expand = c(0.01,0.01), breaks = 1:6)+
+   scale_fill_npg()+
+  
+   labs(x="Plot number", y="Block number", fill = "Treatments", 
+        title = "Experimental layout for RCBD",
+        subtitle = "Six treatments with four replicates each are randomly assigned within four blocks of six plots each",
+        caption = "Plot letter indicates treatment type, number indicates replicate. E.g., E1 refers to the first replicate of treatment E") +
+
+   theme(
+     panel.background = element_blank(),
+     axis.text = element_text(size=rel(1), color="black"),
+     axis.title = element_text(size=rel(1), color = "black", "bold"),
+     plot.title = element_text(size=rel(2), color="black", face = "bold"),
+     plot.subtitle = element_text(size=rel(1),color="black"),
+     legend.title = element_text(size=rel(1.3), color="black", face = "bold"),
+     legend.text = element_text(size = rel(1.2)),
+     legend.justification = "top")
+
+```
+
+This is one example of a RCBD experimental design. In some instances, changing the block shape may better represent what areas are likely to be more similar.
+
+In the previous example, we assumed that our plots occurred in a row in different fields, regardless of the fields' proximity to each other. Now, consider a slightly different circumstance: Imagine you have four fields (blocks) where there are both rows and columns of available plots. We can easily modify our previous RCBD design to accommodate these conditions. 
+
+Now, we will show how to modify our previous example data to correspond with the new block structure: 
+
+```{r, fig.align = "center", fig.height = 7, fig.width = 10}
+
+RCBD_layout2 <-  RCBD$book %>% 
+       mutate(row   = factor(c(1,1,1,2,2,2,1,1,1,2,2,2,3,3,3,4,4,4,3,3,3,4,4,4)),
+              column = factor(c(1,2,3,1,2,3,4,5,6,4,5,6,1,2,3,1,2,3,4,5,6,4,5,6)))
+
+RCBD_layout2$id <- paste(RCBD_layout2$trt,RCBD_layout2$block,sep = "")
+
+ ggplot(RCBD_layout2, aes(y=row, x = column)) + 
+   geom_blank() +
+   geom_rect(aes(xmin=0.5,xmax=3.5,ymin=2.5,ymax=4.5), fill="#bfd3e6",color="black") + # Block 1
+   geom_rect(aes(xmin=3.5,xmax=6.5,ymin=2.5,ymax=4.5), fill="#fdae61",color="black") + # Block 2
+   geom_rect(aes(xmin= 0.5,xmax=3.5,ymin=0.5,ymax=2.5),fill="#abdda4",color="black") + # Block 3
+   geom_rect(aes(xmin=3.5,xmax=6.5,ymin=0.5,ymax=2.5), fill="#cccccc",color="black") + # Block 4
+ 
+   geom_tile(aes(fill=trt), width=.85, height=0.80, color = "black", size = 1) +
+   geom_label(aes(label = id), size = 8) + 
+
+
+   scale_y_discrete(limits = rev) +
+   scale_x_discrete(expand = c(0.01,0.01)) +
+   scale_fill_npg() +
+   
+   labs(x=NULL, y=NULL, fill = "Treatments", 
+        title = "Experimental layout for RCBD", 
+        subtitle = "Alternative blocking layout",
+        caption = "Plot letter indicates treatment type, number indicates replicate. E.g., E1 refers to the first replicate of treatment E") +
+   
+   theme(
+     axis.ticks = element_blank(),
+     panel.background = element_blank(),
+     axis.text = element_text(size=rel(1), color="black"),
+     axis.title = element_text(size=rel(1), color="black", face="bold"),
+     plot.title = element_text(size=rel(2), color="black", face = "bold"),
+     plot.subtitle = element_text(size=rel(1.2), color="black", face = "bold"),
+     legend.title = element_text(size=rel(1.3), color="black", face = "bold"),
+     axis.title.x = element_text(size=rel(1.3), color="black", face = "bold", hjust = .95),
+     axis.title.y = element_text(size=rel(1.3), color="black", face = "bold", hjust = .1),
+     legend.text = element_text(size = rel(1.2)),
+     legend.justification = "top")
+```
+
+We've shown how different block conformations can be accommodated with randomization tools. Now we can move on to more complicated experimental designs, such as those including combinations of multiple treatments. 
+
+## **Factorial Experimental Design**
+
+Often, we will want to investigate the impact of different combinations of treatments. For instance, we may want to test the interactions of different fungicides with a variety of cultivars. Experiments where research units are treated with multiple treatment variables are called *factorial* or *multi-factorial* experiments. Just like the previous examples where we used treatments A-F in isolation of each other, we will want to apply randomization principles to factorial experiments to minimize bias.
+
+### **Factorial x CRD**
+
+For this example, we will create a data set with *3 levels* of *2 variables* each. The first variable (V1) has levels "A", "B", and "C", while the second variable (V2) has levels "X", "Y", and "Z". This means that there are *9 treatment combinations* possible (e.g., "AX", "AY", "AZ", "BX", and so on). We will again use *4 replicates* of each treatment combination, and use a CRD to randomly assign plot location to each experimental unit. In this example, we are assuming that we are using a single location/field, and do not need to create a blocking design (RCBD). 
+
+```{r, fig.align = "center", fig.height = 7, fig.width = 10}
+
+# Defining two treatments, each with 3 levels
+treat_level<-c(3,3)
+
+# Using 'design.ab()' to create a CRD with 4 replicates for each treatment combo
+fact_CRD <- design.ab(treat_level, r=4, serie=0, design="crd", seed=09041909)
+
+# Transform CRD results to a data frame and format
+fact_CRD_layout <- fact_CRD$book %>% 
+        mutate(row = rep(1:6, each=6),
+              column = rep(1:6, 6)) %>% 
+   mutate(trt1 = factor(A, labels = c("A", "B", "C")), # Name the cultivars
+          trt2 = factor(B, labels = c("X", "Y", "Z"))) %>% # Name the fungicide treatments
+            mutate(comb.trt = paste(trt1, trt2, sep = ""),
+          ids = paste(trt1, trt2, r, sep = "")) %>% # Name individual exp. units with trtmt combo and rep number
+  select(plots, r, row, column, trt1, trt2, comb.trt, ids)
+head(fact_CRD_layout)
+
+# Visualize the CRD layout
+ ggplot(fact_CRD_layout, aes(y=row, x = column)) + 
+   geom_tile(aes(fill=trt1), width=.95, height=0.95, color = "black", size = 1) +
+   geom_label(aes(label = ids), color = "black", size = 6, label.size = NA) +
+
+   scale_y_reverse(expand = c(0.01,.01), breaks = 1:6) +
+   scale_x_continuous(expand = c(0.01,0.01), breaks = 1:6) +
+   
+   scale_fill_manual(values = c("#E64B35FF", "#4DBBD5FF", "#00A087FF"), labels = c("Control","Fung. X", "Fung. Y")) +
+
+   labs(x="Columns", y="Rows", 
+        fill = "Treatment \n combinations", 
+        title = "Factorial layout using a CRD",
+        subtitle = "Randomized plot assignment of 9 treatment combinations",
+        caption = "Plot letters indicate treatment combo, number indicates replicate. E.g., BZ1 refers to the first replicate of treatment combo BZ.") +
+
+   theme(
+     panel.background = element_blank(),
+     axis.text = element_text(size=rel(1), color="black"),
+     axis.title = element_text(size = rel(1), color = "black", face = "bold"),
+     plot.title = element_text(size=rel(2), color="black", face = "bold"),
+     plot.subtitle = element_text(size=rel(1), color="black"),
+     legend.title = element_text(size=rel(1), color="black", face = "bold"),
+     legend.text = element_text(size = rel(1)),
+     legend.justification = "top" ) 
+ 
+```
+
+#### **Factorial x split-plot CRD**
+
+In many studies, we are constrained by where we can conduct our observations. We can use a *split-plot* experimental design to deal with these limitations in a factorial experiment. The main principle of split-plot experiment designs is that we assign treatments to entire *sub-plots* within the larger plot, as can be visualized in the next illustration. This can allow us to use large-scale farming equipment where plant-by-plant precision is not available, such as with planting or spraying machinery.
+
+Imagine that you want to study the efficacy of **three fungicide treatments on three wheat cultivars** with different levels of disease resistance. In our example, we have **36 plots** available for our experiment. We will use four replicates of each combination of treatments. Because of the range of the spraying machinery, we must apply the fungicide treatment in strips of 1x3 plots (as shown below). We can plant cultivars individually, so cultivar plot assignment is completely random.
+
+First we can assign the most constricted variable, the fungicide treatment, to individual rows of the larger design, making 1x3 plot strips of fungicide treatment. Then, we can assign the less-constricted variable, cultivar choice, to individual plots (or sub-plots) *within* the 1x3 plot strips for fungicide treatment. This results in a factorial experiment where spatial heterogeneity is controlled for with randomization, and limitations associated with spraying equipment are considered. 
+
+```{r, fig.align = "center", fig.height = 7, fig.width = 10}
+
+# Define variables:
+trt1 <- c("X","Y","O")  # More constricted variable: fungicide treatments X and Y, and control O
+trt2 <- c("A","B","C")  # Less constricted variable: cultivar choices A, B, and C
+
+# Use 'design.split()' to create a CRD with four replicates of all 9 treatment combos
+split_CRD <- design.split(trt1, trt2, r=4, design=c("crd"),serie = 0, seed=09041909)
+
+# Assign rows and columns, create combo and individual exp. unit names
+split_CRD_layout <- split_CRD$book %>% 
+        mutate(row = rep(1:6, each=6),
+              column = factor(rep(1:6, 6)),
+              comb.trt = paste(trt1, trt2, sep = ""),
+              ids = paste(trt1, trt2, r, sep = ""))
+split_CRD_layout
+
+# Visualize the plot assignments:
+ggplot(split_CRD_layout, aes(y=row, x = column)) + 
+   geom_tile(aes(fill=trt1), width=.85, height=0.85, color = "black", size = 1) +
+   geom_label(aes(label=ids), color = "black", size = 6) +
+
+   scale_y_reverse(expand = c(0.01,.01), breaks = 1:6) +
+   scale_x_discrete(expand = c(0.01,0.01), breaks = 1:6) +
+   
+   scale_fill_manual(values = c("#E64B35FF", "#4DBBD5FF", "#00A087FF"),name = "Fungicide \ntreatment", labels = c("Control","Fung. X", "Fung. Y")) +
+
+       labs(x="Plot columns", y="Plot rows",  fill = "Fungicide \n treatment", 
+         title = "Factorial experimental layout - \n Split plot design (CRD)",
+        subtitle = "3 fungicide treatments applied in 1x3 \n plot strips to 3 cultivars", 
+        caption = "Plot letters indicate treatment combo, number indicates replicate. \nE.g., BZ1 refers to the first replicate of treatment combo BZ. \nFungicide treatment is indicated by color, showing 1x3 plot strips; \n3 examples of these strips are shown in dashed black lines.") +
+
+   theme(
+     panel.background = element_blank(),
+     axis.title = element_text(size=rel(1), color = "black", face = "bold"),
+     axis.text = element_text(size=rel(1), color="black"),
+     plot.title = element_text(size=rel(2), color="black", face = "bold"),
+     plot.subtitle = element_text(size=rel(1.2), color="black"),
+     legend.title = element_text(size=rel(1.3), color="black", face = "bold"),
+     legend.text = element_text(size = rel(1.2)),
+     legend.justification = "top" ) +
+  
+     geom_rect(aes(xmin=0.5,xmax=3.5,ymin=1.5,ymax=0.5), linetype = 2, color="black", fill = NA, linewidth = 1.5) + # Fung. strip 1
+     geom_rect(aes(xmin=0.5,xmax=3.5,ymin=2.5,ymax=1.5), linetype = 2, color="black", fill = NA, linewidth = 1.5) + # Fung. strip 2
+     geom_rect(aes(xmin=0.5,xmax=3.5,ymin=3.5,ymax=2.5), linetype = 2, color="black", fill = NA, linewidth = 1.5)  # Fung. strip 3
+
+```
+
+### **Factorial x RCBD**
+
+Factorial experiments can become even more complicated if you need to use a block design. Imagine that you are performing the same factorial experiment as earlier, but your plots are divided among **4 different fields** (blocks). Each field has **9 plots in a 3x3 design**. We can use a RCBD to assign *one representative/replicate of each treatment* to each block. This reduces bias in a complex experiment by ensuring that one replicate of each treatment combination is in each block, preventing any single treatment from being disproportionately impacted by the heterogeneous conditions in a single block. 
+
+We will modify the previous example to show how to apply a RCBD:
+
+```{r, fig.align = "center", fig.height = 7, fig.width = 10}
+
+# Two treatments combination, each with 3 levels
+treat_level<-c(3,3)
+
+# Use 'design.ab()' to create a factorial RCBD with 4 replicates of each combo
+fact_RCBD <- design.ab(treat_level, r=4, serie=0, design="rcbd", seed=09041909)
+
+# Transform RCBD results to a data frame and format
+fact_RCBD_layout <- fact_RCBD$book %>% 
+        mutate(row = rep(1:6, each=6),
+              column = rep(1:6, 6),) %>% 
+  # Assign rows and columns to each block according to the 3x3 block layout
+  mutate(row   = factor(c(1,1,1,2,2,2,3,3,3, # Block 1 rows
+                               1,1,1,2,2,2,3,3,3,   # Block 2 rows
+                               4,4,4,5,5,5,6,6,6,   # Block 3 rows
+                               4,4,4,5,5,5,6,6,6)), # Block 4 rows
+              column = factor(c(1,2,3,1,2,3,1,2,3,  # Block 1 columns
+                               4,5,6,4,5,6,4,5,6,   # Block 2 columns
+                               1,2,3,1,2,3,1,2,3,   # Block 3 columns
+                               4,5,6,4,5,6,4,5,6)), # Block 4 columns
+              r = rep(1:4, each = 9)) %>% # Assign replicate number
+   mutate(trt1 = factor(A, labels = c("X", "Y", "O")), 
+          trt2 = factor(B, labels = c("A", "B", "C")),
+          comb.trt = paste(trt1, trt2, sep = ""),
+          ids = paste(trt1, trt2, r, sep = "")) %>%
+  select(block, plots, r, row, column, trt1, trt2, comb.trt, ids)
+head(fact_RCBD_layout)
+
+# Visualize
+ggplot(fact_RCBD_layout, aes(y=row, x = column)) + 
+    geom_blank() +
+    
+  # Use colored rectangles to represent blocks
+    geom_rect(aes(xmin=0.5,xmax=3.5,ymin=3.5,ymax=6.5), fill="#bfd3e6",color="black") + # Block 1
+    geom_rect(aes(xmin=3.5,xmax=6.5,ymin=3.5,ymax=6.5), fill="#fdae61",color="black") + # Block 2
+    geom_rect(aes(xmin= 0.5,xmax=3.5,ymin=0.5,ymax=3.5),fill="#abdda4",color="black") + # Block 3
+    geom_rect(aes(xmin=3.5,xmax=6.5,ymin=0.5,ymax=3.5), fill="#cccccc",color="black") + # Block 4
+ 
+   geom_tile(aes(fill = trt1), width=.8, height=0.8, color = "black", size = 1) +
+   geom_label(aes(label = ids), size = 6, label.size = NA) +
+
+   scale_y_discrete(expand = c(0.01,.01), breaks = 1:6, limits = rev) +
+   scale_x_discrete(expand = c(0.01,0.01), breaks = 1:6) +
+   
+   scale_fill_brewer(palette = "Set1") +
+   
+   labs(x="Columns", y="Rows", fill = "Fungicide \ntreatment",
+        title = "Factorial layout using a RCBD in 4 blocks",
+        subtitle = "Each factor has 3 levels and each combination has 4 replications", 
+        caption = "Plot letters indicate treatment combo, number indicates replicate. \nE.g., BZ1 refers to the first replicate of treatment combo BZ. \nBackground color indicates block identity.") +
+
+   theme(
+     panel.background = element_blank(),
+     axis.title = element_text(size = rel(1), color = "black", face = "bold"),
+     axis.text = element_text(size=rel(1), color="black"),
+     plot.title = element_text(size=rel(2), color="black", face = "bold"),
+     plot.subtitle = element_text(size=rel(1.2), color="black"),
+     legend.title = element_text(size=rel(1), color="black", face = "bold"),
+     legend.text = element_text(size = rel(1)),
+     legend.justification = "top" ) +
+  
+     geom_rect(aes(xmin=0.5,xmax=3.5,ymin=6.5,ymax=5.5), size = 1., linetype = 2, color="black", fill = NA) +
+   geom_rect(aes(xmin=0.5,xmax=3.5,ymin=5.5,ymax=4.5), size = 1., linetype = 2, color="black", fill = NA) +
+   geom_rect(aes(xmin=0.5,xmax=3.5,ymin=4.5,ymax=3.5), size = 1., linetype = 2, color="black", fill = NA)
+
+```
+
+Just as with CRD factorial split-plot designs, we can be constricted by a variable in factorial RCBD experiments. Now, we will modify the example experiment we have been working on by limiting fungicide application to 1x3 plot strips. Now we can incorporate a 4-block design with this constricted variable to reduce bias in our experiment. 
+
+```{r, fig.align = "center", fig.height = 7, fig.width = 10}
+
+# Designing our factorial split RCBD experiment with 'design.split()'
+split_RCBD <- design.split(trt1, trt2,r=4, design=c("rcbd"),serie = 2,seed = 09041909)
+split_RCBD
+
+# Assigning row and column location
+split_RCBD_layout <- split_RCBD$book %>% 
+       mutate(row   = factor(c(1,1,1,2,2,2,3,3,3, # Block 1
+                               1,1,1,2,2,2,3,3,3,   # Block 2
+                               4,4,4,5,5,5,6,6,6,   # Block 3
+                               4,4,4,5,5,5,6,6,6)), # Block 4
+              column = factor(c(1,2,3,1,2,3,1,2,3, # Block 1
+                               4,5,6,4,5,6,4,5,6,   # Block 2
+                               1,2,3,1,2,3,1,2,3,   # Block 3
+                               4,5,6,4,5,6,4,5,6)),
+              comb.trt = paste(trt1, trt2, sep = ""),
+          ids = paste(trt1, trt2, block, sep = "")) # Block 4
+
+# Visualize
+ggplot(split_RCBD_layout, aes(y=row, x = column)) + 
+    geom_blank() +
+    
+  # Use colored rectangles to represent blocks
+    geom_rect(aes(xmin=0.5,xmax=3.5,ymin=3.5,ymax=6.5), fill="#bfd3e6",color="black") + # Block 1
+    geom_rect(aes(xmin=3.5,xmax=6.5,ymin=3.5,ymax=6.5), fill="#fdae61",color="black") + # Block 2
+    geom_rect(aes(xmin= 0.5,xmax=3.5,ymin=0.5,ymax=3.5),fill="#abdda4",color="black") + # Block 3
+    geom_rect(aes(xmin=3.5,xmax=6.5,ymin=0.5,ymax=3.5), fill="#cccccc",color="black") + # Block 4
+
+   geom_tile(aes(fill=trt1), width=.85, height=0.85, color = "black", size = 1)+
+   geom_label(aes(label =ids), color="black", size = 8, label.size = NA)+
+
+   scale_y_discrete(expand = c(.01,.01), limits = rev) +
+   scale_x_discrete(expand = c(.01,.01)) +
+   
+   scale_fill_manual(values = c("#E64B35FF", "#4DBBD5FF", "#00A087FF"), labels = c("X","Y", "O")) +
+
+   labs(x=NULL, y=NULL, fill = "Fungicide \ntreatment", 
+        title = "Factorial experimental layout - Split plot design (RCBD)",
+        subtitle = "Each factor has three levels and each combination 4 replications,\nDashed rectangles indicate the whole plot level\nSubplots with the same background color are members of the same block", 
+        caption = "Factor A is represented by the fill color of the experimental unit
+                   Factor B is represented by the label of the experiment unit")+
+  theme(
+     panel.background = element_blank(),
+     axis.title = element_text(size=rel(1), color="black"),
+     axis.text = element_text(size=rel(1), color="black"),
+     plot.title = element_text(size=rel(2), color="black", face = "bold"),
+     plot.subtitle = element_text(size=rel(1.2), color="black", face = "bold"),
+     legend.title = element_text(size=rel(1.3), color="black", face = "bold"),
+     legend.text = element_text(size = rel(1.2)),
+     legend.justification = "top" ) +
+      
+   geom_rect(aes(xmin=0.5,xmax=3.5,ymin=6.5,ymax=5.5), size = 1., linetype = 2, color="black", fill = NA) +
+   geom_rect(aes(xmin=0.5,xmax=3.5,ymin=5.5,ymax=4.5), size = 1., linetype = 2, color="black", fill = NA) +
+   geom_rect(aes(xmin=0.5,xmax=3.5,ymin=4.5,ymax=3.5), size = 1., linetype = 2, color="black", fill = NA)
+
+```
+
+Now that we understand some of the basic experimental designs used to control for bias in field and agricultural experiments, we can learn statistical methods for estimating variance between experimental units within and between treatments. 
+
+## **Analysis**
+
+Even with randomization techniques, experimental units such as plants will have natural variation. It's important to understand how much variation occurs because of random or uncontrollable influences, and how much variation occurs because of treatment or location. We can use base R and packages like `psych` to generate statistical descriptions and visualize our data. We can apply techniques such as linear regression and ANOVA to our experiments to approximate the influence of certain treatments and to estimate our certainty of the result.
+
+Many of the topics we'll discuss are taught in basic statistics courses. We won't be able to cover the entirety of many of these statistical topics, but we will show how they can be applied to studies of plant disease. A helpful resource for doing in statistics in R can be found [here](https://statsandr.com/blog/anova-in-r/). You can also view function documentation with `?()` and `help()` for information on applying specific tests.
+
+Before we get into the different statistical tests and how to apply them, we should discuss the assumptions we will operate under and how they're related to the experimental designs we've discussed above.
+
+### **Assumptions**
+
+Some considerations in applying many statistical tests include the type of data (quantitative vs. categorical), independence of samples, and the distribution of values. These assumptions are important, often critical, for the interpretation of results. In some cases, the data can be transformed to meet assumptions such as the normal distribution of response values. In other cases, statistical methods cannot be applied without creating misleading or false results. Here, we will briefly explain the most important assumptions we make when we use statistical tests to compare treatments. 
+
+#### **The dependent variable is quantitative**
+The dependent or response variable (the variable you are measuring in response to a treatment) must be quantitative to perform common statistical tests like linear regression and ANOVA. This is because these tests perform mathematical operations on numerical data to get results. Depending on the situation, you can use 'dummy coding' to turn categorical values into quantitative, but the results may or may not be meaningful, depending on your situation.
+
+#### **Independence of samples**
+We assume that each sample is independent of the others. *In many agricultural experiments, we cannot guarantee complete independence between samples.* Depending on the constraints of experiments, one treatment may influence its neighbor. An example could be the chemistry of arbitrary treatment A coming into contact with a treatment B plant. This could happen because of sprayer drift, wind blowing one plant into contact with another, or because an animal visited both plants and transferred chemistry. One advantage of practicing randomized experimental designs is that we can assume that each treatment is *as independent* as any other, and that unintentional contamination between treatments is random. We can assume that hypothetical treatment A and treatment B were equally likely to influence each other due to their randomized locations, giving them relative independence in an imperfect world, and apply statistical methods.   
+
+#### **Normal distribution of response values**
+We assume that the response values are normally distributed. That is, they follow a bell curve pattern, where more samples are represented near the mean value, with fewer values at the minimum and maximum values like in the next image. The justification for this assumption is beyond the scope of this lesson, but if you're curious you can learn more about this assumption [here](https://www.statisticshowto.com/probability-and-statistics/normal-distributions/central-limit-theorem-definition-examples/) abd [here](https://towardsdatascience.com/6-ways-to-test-for-a-normal-distribution-which-one-to-use-9dcf47d8fa93#:~:text=For%20quick%20and%20visual%20identification,use%20the%20Shapiro%20Wilk%20test.).
+
+What you need to know is that checking for normal distribution is very important for tests with fewer experimental units (n), and becomes more negotiable in experiments with more experimental units. Normal distribution can be evaluated with simple plots, such as histograms and boxplots, creating Quantile-vs-quantile (QQ) plots, and with tests such as the Shapiro-Wilk test.
+
+#### **Homogeneity of variance**
+A key assumption is that variance levels are approximately equivalent among treatments. When statistical tests are applied to data with drastically different variance levels, there is a much greater probability of getting a result that falsely supports the hypothesis. Tests for estimating the homogeneity of variance levels include Bartlett's test, Levene's test, and Fligner-Killeen's test. 
+
+### **CRD example**
+
+In this example of a simple CRD experiment, we want to determine if treatment type influenced plant height. We have **three treatments**, (A, B, and C) with **6 replicates** each. The plants were arranged in a CRD layout, minimizing the potential impact of random heterogeneity on the data. The variable of interest is the **height** of the plant, a quantitative variable. We assume that each plant is independent of other plants, that the values within treatments are normally distributed, and that variances are approximately equal across treatment groups. 
+
+```{r, fig.align = "center", fig.height = 4, fig.width = 5}
+
+# Create our example data
+height_data <- data.frame(
+             trt    = rep(c("A","B","C"), each=6),
+             height = c(66, 67, 74, 73, 75, 64,	
+                        85, 84, 76, 82, 79, 86,	
+                        91, 93, 88, 87, 90, 86))
+height_data
+
+# Visualize the height distribution in the example data
+p <- ggplot(height_data, aes(x = trt, y = height)) +
+   geom_boxplot() +
+   geom_point(aes(fill = trt), shape = 21, size = 5,  show.legend = FALSE) +
+   labs(y = "Height (cm)", x = "Treatment") +
+   theme(axis.text = element_text(color = "black"))
+p
+
+# We can use 'describeBy()' to get statistical summaries of our data. We can easily check for distribution normality and roughly equivalent levels of variance.
+describeBy(height ~ trt, data = height_data)
+```
+
+```{r}
+
+# Include describeBy() report with annotations showing SD, median and range?, and skew. 
+
+```
+
+In the report provided by `describeBy()`, we have received values indicating the data's distribution and variance levels. We can use the Shapiro-Wilk test to determine if we can consider the distribution of values within treatments to be normal. 
+
+```{r}
+
+# Apply the test to the response variable
+shapiro.test(height_data$height)
+
+```
+
+Essentially, the Shapiro-Wilk test calculatess the probability that our data is significantly different from a perfectly normalized distribution. The p-value provided with the Shapiro-Wilk test is above 0.05, indicating that our data is normally distributed and that we can continue on to apply statistical methods like ANOVA to this data. 
+
+The `describeBy()` report also indicates the amount of variance within treatment types with the 'sd' (standard deviation) value. The standard deviations within our three treatments are relatively close in value, but we can still test to make sure the assumption of heterogeneous variation is fulfilled with a few different tests. 
+
+```{r}
+
+# Bartlett test
+bartlett.test(height ~ trt, data = height_data)
+
+# Levene's test 
+height_lm <- lm(height ~ trt, data = height_data)
+leveneTest(height_lm, center = "mean")
+
+# Fligner-Killeen test
+fligner.test(height ~ trt, data = height_data)
+```
+
+The p-values produced by all three tests indicate that the variance levels between treatments are *not* significantly different. This supports our assumption of heterogeneous variance levels. 
+
+We have quantitative data from independent samples with approximately normal distribution and homogeneous levels of variance. We can now use statistical tools like regression and ANOVA to evaluate the potential impact of treatment on plant height. 
+
+```{r}
+
+# We created a linear model (a type of regression) for use in Levene's test. We can look at a summary of the model.
+summary(height_lm)
+
+# ANOVA
+anova(height_lm)
+```
+
+Pay attention to the **adjusted R-squared** and **p-value** indicated in the report of the linear model, height_lm. The R-squared value indicates that roughly ~81.8% of variation in plant height can be attributed to treatment type. The p-value is small, well below the threshold of 0.05 commonly used. This indicates that it is very unlikely that we have obtained a result that falsely supports the hypothesis. Great! 
+
+In the ANOVA report, the F-value and Pr(>F) (essentially a p-value) show a similar result. The F-value is the proportion of *explained variance*, variation in height due to treatment, to *unexplained variance*, variation due to random or environmental factors. Larger F-values indicate stronger influence of treatment variables on the result. The Pr(>F) value is also much smaller than 0.05, indicating that there is a low probability that this is a false result. 
+
+As you can see, we got the same answer (that plant height was statistically different between treatments) from *both* tests. In many cases, you can use either the regression model or the ANOVA. However, many prefer the ANOVA because of the simpler reporting format and because a linear model isn't necessarily meaningful for experiments where the treatments are not a continuous variable. For instance, the linear model shows a slope of 12.167 from treatment A to B, and 19.333 from treatment A to C. If treatments A, B, and C are categorically different (e.g., different products) instead of quantitatively different (e.g., different concentrations of the same product), a linear relationship may not make sense. 
+
+### **RCBD**
+
+Now that we've analyzed a simple CRD experiment, we can move on to a more complex RCBD experiment. In this example, we have *four treatments* A, B, C, and D arranged in *four blocks*, with *four replicates* each. The response variable is *yield* in bushels/acre (bu/ac), and we want to know if yield is impacted by treatment type or by block. 
+
+```{r}
+# Create the data
+yld_data <- data.frame(
+         trt = rep(c("A", "B", "C", "D"),4),
+         blk = as.factor(rep(1:4,each = 4)),
+         yld = c(95.3, 114.6, 112.0, 116.6,
+                 99.5, 119.1, 115.5, 113.2,
+                 98.0, 118.9, 118.2, 117.0,
+                 98.0, 118.2, 105.1, 117.8))
+yld_data
+
+```
+
+First, we will revisit our assumptions. The response variable, yield, is quantitative. We also can assume that our samples, the plots in which we get yield, are independent. Now we can visualize the distribution of yield values and run the Shapiro-Wilk test to see if the data are distributed normally. 
+
+```{r}
+
+# Visualize the data
+ggplot(yld_data, aes(x=trt, y = yld))+
+   geom_boxplot(outlier.alpha = 0)+
+   geom_jitter(aes(fill = trt), width = 0.2, shape = 21, size = 5,  show.legend = FALSE)+
+   labs(y = "Yield (bu/ac)", x = "Treatment")+
+   theme(axis.text = element_text(color = "black"))
+
+# Shapiro-Wilk test
+yld_lm <- lm(yld ~ trt, data = yld_data)
+shapiro.test(yld_lm$residuals)
+
+```
+
+The p-value provided by the Shapiro-Wilk test is greater than 0.05, indicating that yield values are normally distributed. Now we can check that variance within treatments is relatively equal.
+
+```{r}
+
+bartlett.test(yld ~ trt, data = yld_data)
+
+```
+
+The Bartlett test indicates that variance is not significantly different within treatments (p-value > 0.05). We can go ahead with our analysis. We will quickly run a regression model and ANOVA, including block as a variable.  
+
+```{r}
+
+# Regression
+RCBD_yld_lm <- lm(yld ~ trt + blk, data = yld_data)
+summary(RCBD_yld_lm)
+
+# ANOVA
+anova(RCBD_yld_lm)
+
+```
+
+The relative influence of treatments B, C, and D (compared to treatment A) is indicated in the 'Estimate' column of the regression summary. Larger values indicate a greater impact, and their associated p-values indicate whether that impact is statistically significant. In this case, treatments A, B, C, and D have statistically different yield values while block number does not. The adjusted R-squared value indicates that this model (including treatment *and* block) explains approximately 85.55% of variation in yield. The p-value is less than the threshold of 0.05, indicating that we can be confident in the result.
+
+In the ANOVA, the Pr(>F) value (essentially a p-value) indicates that yield values are significantly different by treatment, but not by block. This agrees with the results found in the regression. 
+
+#### **Mean comparisons**
+
+We can add several other statistical tests to our toolkit. We can compare the means of different treatment groups with several new tests to see if there is a significant difference between them. These tests include the Least Significant Difference (LSD) test, the Tukey (or Honestly Significant Difference (HSD)) test, and the Duncan test. 
+
+There are several packages in R that have functions for means comparison, but we'll use options in the `agricolae` package. In each case, we will set `alpha = 0.05` to represent our threshold p-value. 
+
+```{r}
+
+# Least Significant Difference (LSD)
+RCBD_yld_LSD <- LSD.test(RCBD_yld_lm, trt="trt", alpha=0.05) 
+RCBD_yld_LSD
+
+# Tukey/Honestly Significant Difference (HSD)
+RCBD_yld_HSD <- HSD.test(RCBD_yld_lm, trt="trt", alpha=0.05) 
+RCBD_yld_HSD
+
+# Duncan test
+RCBD_yld_DUN <- duncan.test(RCBD_yld_lm, trt="trt", alpha=0.05) 
+RCBD_yld_DUN
+
+```
+
+The important part of the results is in the `$groups` section. Treatment name, yield, and a group identifier are presented. The group identified, a letter, indicates groups where the means are not significantly different. In this case, treatments B, C, and D are in group a, meaning that they are not significantly different. Treatment A is in a different group, showing that its yield data *is* significantly different. 
+
+### **RCBD factorial**
+
+Now we will analyze the variation between experimental units in an example multi-factorial RCBD experiment. In this example experiment, our two variables are *treatments A, B, C, and D* and *varieties R and S*. Each combination of A, B, C, D and R and S has *four replicates* that are arranged in *four blocks*. *Yield data* is collected for each experimental unit.
+
+```{r}
+
+# We create the example data 'data_yld_fac':
+data_yld_fac <- data.frame(
+         trt = rep(c("A", "A", "B", "B", "C", "C", "D", "D"),4),
+         var = rep(c("R", "S"),16),
+         blk = as.factor(rep(1:4,each = 8)),
+         yld = c(86.6, 92.3, 104.9, 111.6, 105.2, 122, 105.4, 116.6, 81.1, 99.5, 99, 
+                 119.1, 108.4, 115.5, 94.6, 113.2, 84.8, 98, 107.1, 118.9, 110.8, 118.2,
+                 104.1, 117, 84.5, 98, 101.4, 118.2, 109.8, 105.1, 106.1, 117.8))
+
+# Create column 'combo' to describe each combination of the two treatments
+data_yld_fac$combo <- paste(data_yld_fac$trt, data_yld_fac$var, sep = "")
+
+data_yld_fac
+
+```
+
+First we will check the the assumptions we make when applying statistical tests. Our respons variable, yield, is quantitative and we can assume the samples are independent. Now we check to see if the data is normally distributed with the Shapiro-Wilk test. 
+
+```{r}
+
+# Let's visualize the distribution of yield ('yld')
+ggplot(data_yld_fac, aes(x=combo, y = yld)) +
+  geom_boxplot(outlier.alpha = 0) +
+  geom_jitter(aes(fill=combo), width = 0.2, shape = 21, size = 5, show.legend = FALSE) +
+  labs(y = "Yield (bu/ac)", x = "Combinations") +
+  theme(axis.text = element_text(color = "black"))
+
+
+# Apply the Shapiro- Wilk test to the response variable
+shapiro.test(data_yld_fac$yld)
+
+```
+
+The resulting p-value is above the threshold of 0.05, meaning that we can consider the yield values to be normally distributed. Now we can use the Bartlett test to see if variance levels among different treatments are relatively equal. 
+
+```{r}
+
+# Apply the Bartlett test 
+bartlett.test(yld ~ combo, data = data_yld_fac)
+
+```
+
+The p-value of 0.3702 indicates that treatments have similar levels of variance between samples. We can move forward with our analysis by applying a linear model and running an ANOVA to the data. This will be similar to the first example, a CRD experiment, but instead of one explanatory variable, we'll have two. We can also include block number in the model to see if there was significant variation across the different blocks. 
+
+```{r}
+
+# Create linear model
+RCBD_yld_lm <- lm(yld ~ trt + var + blk, data = data_yld_fac)
+summary(RCBD_yld_lm)
+
+```
+
+The output of the regression model is more complex than in our previous example. Instead of the adjusted R-squared and p-value referring to a single explanatory variable, they indicate the fit of the *overall model*. In this case, 86.42% of variation can be attributed to treatment, variety, and block. The p-value is very small, so we can be quite sure that we do not have a falsely positive result. 
+
+Now look at the values under 'Estimate'. The values for treatments B, C, and D and variety S are quite large, with relatively small p-values. In contrast, block number has much smaller estimated values and non-significant p-values (p>0.05). We can conclude that treatment and variety type significantly influence yield, while block does not. 
+
+```{r}
+# ANOVA
+anova(RCBD_yld_lm)
+
+```
+
+In the ANOVA report, we can see that the F-value for both treatment and variety are large with small (<0.05) p-values, indicating that treatment and variety are significant in determining yield. In contrast, block has a small F-value and large p-value, showing that yield is not significantly impacted by block. This agrees with the results shown in the regression. 
