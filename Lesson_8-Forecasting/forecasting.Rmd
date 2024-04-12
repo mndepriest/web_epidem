@@ -1,6 +1,6 @@
 ---
 title: "Disease Forecasting"
-author: "Felipe Dalla Lana; Mladen Cucak; Mauricio Serrano; Paul Esker"
+author: "Felipe Dalla Lana; Mladen Cucak; Mauricio Serrano; Paul Esker, Miranda DePriest"
 output:
   html_document:
     code_folding: show
@@ -13,548 +13,669 @@ editor_options:
   chunk_output_type: console
 ---
 
-## Introduction
+## **Introduction**
 
-In this exercise, a few examples of disease forecasting and decision support systems will be shown based on specific weather conditions and intervention thresholds. While disease forecasting uses several different tools for model development, validation, and application, the generic system shown in this activity is based on modeling disease infection rate conditional on a combination of temperature, rainfall, and the level of infection.
+Now we will learn about disease forecasting and decision support systems. Many different tools are used in disease forecasting, so this lesson will use a generic system where disease infection rate is conditional on a combination of temperature, rainfall, and previous level of infection. 
 
+## **Unconditional disease progress**
 
-## Rate of disease progress - uncondtional 
+First, we will cover an example where the rate of disease progress is unconditional. This means that the rate of infection is not dependent of any weather parameters. In this example, the disease will always progress at the same rate. 
 
-First, let's start with a simple disease infection progress curve. The rate here in unconditional, meaning that it does not matter on any weather parameters which could affect the rate of disease development. As such, disease progress will always develop at that the same rate. 
+In the next chunk of code, we will 1) load in the necessary packages, 2) create and transform our data, 3) use a for loop to simulate disease progression through time, and 4) visualize the disease progress. 
 
+```{r unconditional_progress, message = FALSE, warning = FALSE}
 
-```{r message=FALSE, warning=FALSE}
-# Load packages
-library(tidyverse)
-library(purrr)
-library(patchwork)
+# Load necessary packages
+library("tidyverse") # For data manipulation
+library("purrr") # For simulations
+library("patchwork") # For plotting
 
-# First, we will create a matrix of 10 x 1 (= 10 rows x 1 column). For this exercise, assume that each row represents a "weekly" time interval
+# Create data - a 10 x 1 matrix where week and infection level are columns
+data1 <- data.frame(week = c(1:10), 
+                    inf1 = c(1, rep(0,9)))
+data1
 
-examp_1 <- data.frame(p_inf_1 = c(1, rep(0,9)))
+# Set the rate of infection to 1
+r1 <- 1
 
-# Replace the first cell of the column from 0 to 1
+# Use a for loop to simulate infection over 9 weeks based on the logistic growth model (covered in Lesson X):
 
-# Set the rate parameter to 1
-rate <- 1
-
-# Simulate the disease infection for another 9 weeks based on a logistic growth model (week one is set to 1% based on the initial infection size)
-for (j in 2:10) {
-  examp_1[j,] <- examp_1[j-1,] * (1 + rate*(1 - examp_1[j-1,]/100))
+# For weeks 2 through 10
+for (j in 2:10){
+  
+    # Calculate infection in jth week using the infection level in the previous week and the rate of infection
+  data1$inf1[j] <- data1$inf1[(j-1)] * (1 + r1 * (1-data1$inf1[(j-1)]/100))
 }
+data1
 
-examp_1$weeks <- 1:10
-
-examp_1 %>% mutate(weeks = as.factor(weeks)) %>% 
-  ggplot(aes(x = weeks, y = p_inf_1, group = 1))+
-  geom_line(size = 1)+
-  geom_point(shape = 21, color = "white", fill = "black", size=3)+
-  labs(y = 'Infection (%)', 
-       x = "Weeks", 
-       title = "Disease (infection) progress over time")
+# Coerce data1$week into a factor class, then pass it to ggplot()
+data1 %>% mutate(week = as.factor(week)) %>%
+  
+  # Plot infection percentage by week
+  ggplot(aes(x = week, y = inf1, group = 1)) + 
+    geom_point(shape = 21, color = "white", fill = "black", size = 3) +
+    geom_line(linewidth = 1) +
+    labs(y = "Infection (%)", x = "Week", 
+    title = "Disease progress over time")
 
 ```
 
+We have now modeled a simple case where disease progress is unconditional on environmental parameters, and visualized its progress over time. This shows the basics of how disease forecasting can be used to predict what will happen in the future. 
 
-## Rate conditional on specific weather parameters
+## **Disease progress dependent on specific weather parameters**
 
-Now, the idea will be explore disease development considering that the rate of disease progress is conditional on specific weather parameters. For this example, rainfall and temperature will be considered.
+Now we will explore an example where disease progress is dependent on specific weather conditions. In this example, rainfall and temperature will influence our disease progression. To simplify this example, only the *occurrence* of rainfall will be recorded for a week, rather than the amount, with a binomial distribution. In this case, a value of 1 will indicate that rainfall did occur, and 0 will indicate that it did not. Temperature values will be generated using a normal distribution centered around 20°C.
 
-To start, we will create a dataset of 10 weeks and explore how precipitation and temperature modifies disease development.
+In the next chunk of code, we will generate random but reproducible data for rainfall and temperature and visualize both environmental variables over time. 
 
+```{r conditional_weather}
 
-```{r }
+# Define a pseudorandom value to ensure reproducibility 
+set.seed(441909)
 
-set.seed(441909) # Used to make the example reproducible 
+# Create the example weather data
+weather <- data.frame(week = 1:10, 
+                    rain = rbinom(n = 10, size = 1, prob = 0.5), 
+                    temp = 20 + rnorm(n = 10, mean = 0, sd = 2))
 
-weather <- data.frame(weeks = 1:10, 
-                      rain = rbinom(n=10,size=1,prob=.5), # rainfall is considered as a random sample from the binomial distribution
-                      temp = 20+rnorm(n=10,mean=0,sd=2)) # 20 = baseline temperature; create a random sample from a normal distribution 
-                      
+# Coerce week values into factor class and pass the data along to be visualized with a pipe (%>%)
 weather %>% 
-  mutate(weeks = factor(weeks)) %>% 
-  ggplot(aes(x = weeks, group = 1)) +
-  geom_line(aes(y = temp)) +
-  geom_col(aes(y = rain), width = .1) +
-  
+  mutate(week = factor(week)) %>%
+  ggplot(aes(x = week, group = 1)) +
+  geom_line(aes(y = temp)) + # Represent temperature with a line
+  geom_col(aes(y = rain), width = 0.5) + # Represent rainfall with a bar
   scale_y_continuous(limits = c(0,25), breaks = seq(0,25,5)) +
-  
-  labs(title = "Simulated temperature and preciptation over 10 weeks",
-       subtitle = "Lines = temperature (°C); bars = weeks with preciptation", 
-       y = NULL, 
-       x = "Weeks")+
-  theme(axis.text = element_text(colour = "black"))
+  labs(title = "Simulated temperature and rainfall over 10 weeks",
+       subtitle = "Lines = temperature (°C), bars = rainfall", 
+       y = "Temperature (°C)", 
+       x = "Week") + 
+       theme(axis.text = element_text(color = "black"))
 
 ```
 
-<br>
+Now we can move on to the disease progression data. In this example, disease progression requires the occurrence of rainfall. Furthermore, the progression of the disease is highest at temperatures above 20°C, and reduced at temperatures below 20°C. 
 
-Now, we explore what occurs when disease development (and disease progress) requires very specific conditions. Here, disease will progress only in the weeks where precipitation occurs. Furthermore, when the temperature is below 20°C, the rate of disease progress will be reduced (slower disease development), while when the temperature is greater than this threshold, disease intensity will increase.
+In this chunk of code, we will use rainfall and temperature to determine the rate of disease progression (r2), and the percentage of disease (inf). 
 
-```{r}
+```{r conditional_progression}
 
-examp_2 <- 
+# Manipulate weather data to create r2 and create a column for inf
+data2 <- 
   weather %>% 
-  # Assume infection occurs only when there is rain, 
-  # and when the temperature > 20C, infection and disease will increase
-  mutate(rate_2 = rate * rain * (1 + (temp - 20)/20)) %>% 
-  mutate(p_inf_2 =  c(1, rep(0,9))) # just to open a new column
-  
-  for (j in 2:10) {examp_2$p_inf_2[j] <- examp_2$p_inf_2[j-1] * 
-                       (1 + examp_2$rate_2[j-1]*(1 - examp_2$p_inf_2[j-1]/100))}
- 
-examp_2
-```
+  mutate(r2 = r1 * rain * (1 + (temp - 20)/20)) %>% 
+  mutate(inf2 =  c(1, rep(0,9)))
+data2
 
-<br> 
-
-Compare the plots between the rate of disease infection for unconditional and conditional rate situations.
-
-```{r message=FALSE, warning=FALSE}
- data_inf <- left_join(examp_1, examp_2) %>% 
-  mutate(rate_1 = 1, 
-         weeks = factor(weeks)) %>% 
-  select(weeks, p_inf_1, p_inf_2, rate_1, rate_2) 
-
-pivot_longer(data_inf, cols = c(rate_1, rate_2), names_to = "Rate_Perc") %>% 
-    
-ggplot(., aes(x=weeks, y = value, color = Rate_Perc, group = Rate_Perc))+
-    geom_line(size = 1.5)+
-    
-  scale_y_continuous(limits = c(0,1.5), sec.axis = sec_axis(~.*1, breaks = c(0, 1), 
-                labels = c("For Example 2 \nrate is zero when \n there is no rain", 
-                           "Rate of infection \nfor Example 1 is\nconstant equal\nto one")))+
-  scale_x_discrete(expand = c(0,0.02))+
-
-  labs(x = "Weeks", y = "Infection (%)", 
-       title = "Simulated disease progress",
-       subtitle = "Example 1 with continuous infection rate (red line) \nExample 2 with infection rate influenced by rain and temperature (blue line)")+
-  
-  theme(
-    legend.position = "none", 
-    axis.text = element_text(color="black"), 
-    axis.title = element_text(face="bold"))+
-# Annotation for temp >20C
-annotate(geom = "curve", x = 4, y = 1.15, xend = 5.5, yend = 1.3, 
-    curvature = -.3, arrow = arrow(length = unit(2, "mm")), size = 1, color = "grey30") +
-annotate(label = "When temperature is > 20°C\n and there is rain, infection\nrate is > 1",
-         geom = "text", x = 5.6, y = 1.3, hjust = "left")+
-
-# Annotation for temp <20C
-annotate(geom = "curve", x = 4.95, y = .85, xend = 4.5, yend = 0.7, 
-    curvature = .35, arrow = arrow(length = unit(2, "mm")), size = 1, color = "grey30") +
-annotate(label = "When temperature is < 20°C\n and there is rain, infection\nrate is < 1, but > 0",
-         geom = "text", x = 3.9, y = .55, hjust = "left")  
+# Use a for loop to simulate disease progression
+for (j in 2:10) {data2$inf2[j] <- data2$inf2[j-1] * 
+                    (1 + data2$r2[j-1]*(1 - data2$inf2[j-1]/100))
+}
+data2
 
 ```
 
-<br>
+We can see that the disease progresses more quickly when there is rain and when the temperature is above 20°C. Now we'll visualize the rate of infection in both scenarios (r1 and r2)
 
-Now, we will use this information see how disease (infection) progress is impacted.
+```{r rate_of_infection, message = FALSE, warning = FALSE}
 
-```{r message=FALSE, warning=FALSE}
- data_inf <- left_join(examp_1, examp_2) %>% 
-  mutate(rate_1 = 1, 
-         weeks = factor(weeks)) %>% 
-  select(weeks, p_inf_1, p_inf_2, rate_1, rate_2) 
+# Merge data1 and data2
+rates <- left_join(data1, data2, by = join_by(week)) %>%
 
-pivot_longer(data_inf, cols = c(p_inf_1, p_inf_2), names_to = "Inf_Perc") %>% 
-    
-ggplot(., aes(x=weeks, y = value, color = Inf_Perc, group = Inf_Perc))+
-    geom_line(size = 1.5)+
-    
-  scale_y_continuous(sec.axis = sec_axis(~.*1,  
-                                           breaks = c(27, 99.4), 
-                                           labels = c("Example 2\n(27%)", "Example 1\n(99%)")))+
-  scale_x_discrete(expand = c(0,0.02))+
+  # Set r1 and coerce week to factor class
+  mutate(r1 = 1, week = factor(week)) %>%
 
-  labs(x = "Weeks", y = "Infection (%)", 
-       title = "Simulated disease progress",
-       subtitle = "Example 1 with a continuous infection rate \nExample 2 with an infection rate influenced by rain and temperature")+
+  # Select only relevant columns
+  select(week, inf1, inf2, r1, r2) %>%
+
+  # Transform the data to a longer format where r1 and r2 are in columns
+  pivot_longer(.,
+               cols = c(r1, r2),
+               names_to = "Rate_Perc")
+
+# Plot r1 and r2 over time
+ggplot(rates, aes(x = week, y = value, color = Rate_Perc, group = Rate_Perc)) +
+  geom_line(linewidth = 1.5) +
+  scale_y_continuous(limits = c(0, 1.5),
+                     sec.axis = sec_axis(~.*1, breaks = c(1,0.8), 
+                                         labels = c("Rate 1 is a constant", "Rate 2 depends\non environ-\nmental conditions"))) +
+  scale_x_discrete(expand = c(0, 0.02)) +
+  labs(x = "Week", y = "Infection (%)", 
+      title = "Simulated disease progresses\nUnconditional and Conditional") +
+  theme(legend.position = "none") +
+
+  # Add the first arrow
+  annotate(geom = "curve", x = 4, y = 1.15, xend = 5.5, yend = 1.3, curvature = -0.3, arrow = arrow(length = unit(2, "mm")), size = 1, color = "grey30") +
   
-  theme(
-    legend.position = "none", 
-    axis.text = element_text(color="black"), 
-    axis.title = element_text(face="bold"))
+  # Add a label to the first arrow 
+  annotate(label = "When the temperature is above 20\nCelsius and there has been rainfall,\nthe rate of infection is above 1", 
+           geom = "text", x = 5.6, y = 1.3, hjust = "left") +
+  
+  # Add the second arrow 
+  annotate(geom = "curve", x = 4.95, y = 0.85, xend = 4.5, yend = 0.7, curvature = 0.35, arrow = arrow(length = unit(2, "mm")), size = 1, color = "grey30") +
+  
+  # Add a label to the second arrow 
+  annotate(label = "When the temperature is\nbelow 20 Celsius but there\nhas been rainfall, the rate\nof infection is above 0\nand below 1", geom = "text", x = 3.9, y = 0.4, hjust = "left")
 
 ```
 
+We've seen how the rate of infection changes based on whether infection is influenced by certain environmental variables or not. Now let's see how the total infection level is impacted. 
 
-### Simulating multiple scenarios
+In the next chunk, we'll manipulate the data and plot the total infection level (inf1 and inf2) for both scenarios. 
 
-Obviously, weather conditions change, which also influences how we try to forecast disease development. To explore this concept, we will simulate different scenarios to see how changes in weather affect disease development. In this initial example, we will simulate conditions using 500 scenarios. 
+```{r unconditional_and_conditional, message = FALSE, warning = FALSE}
 
-```{r}
-
-# Create a function to simulate multiple scenarios
-
-discast <- function(rate,nweeks,start,rprob){
+# Merge data1 and data2 
+infs <- left_join(data1, data2, by = join_by(week)) %>%
   
-  # rate is the increase in disease under conducive conditions
-  # nweeks is the number of weeks considered
-  # start is the starting infection percentage
-  # rprob is the probability of rain in any given week
+  # Set column r1 to be 1 and make the week column into a factor class
+  mutate(r1 = 1, 
+         week = factor(week)) %>% 
   
-  perinf <- data.frame(p_inf = rep(0,nweeks), 
-                       rain = rbinom(n=nweeks,size=1,prob=rprob), 
-                       temp = rep(0,nweeks))
-  perinf[1,1] <- start
-  perinf[1,3] <- 20
+  # Select 
+  select(week, inf1, inf2)
 
-  # Here we use a little more complex simulation for temperature, considering that each day is not independent, 
-  # but rather a random sample considering the temperature from the day before
-  for(j in 2:nweeks){
-    perinf$temp[j] <- perinf$temp[j-1] + rnorm(n=1,mean=0,sd=2) }
+# Transform infs into a longer dataframe with inf1 and inf2 values as a column
+pivot_longer(infs, cols = c(inf1, inf2),
+             names_to = "Inf_Perc") %>% 
   
-  # Generate the time series of rates
-  perinf <- 
-    mutate(perinf, temp = if_else(temp<0,0,temp)) %>%  # To avoid problem with negative temp
-    mutate(rate = rate * rain * (1+(temp - 20)/20))
- 
-  for (j in 2:10) {perinf$p_inf[j] <- perinf$p_inf[j-1] * 
-    (1 + perinf$rate[j-1]*(1 - (if_else(perinf$p_inf[j-1]>=100, 1, perinf$p_inf[j-1]/100)))) 
+  # And pass it to ggplot2() for visualization 
+  ggplot(., aes(x = week, y = value, color = Inf_Perc, group = Inf_Perc)) +
+  geom_line(linewidth = 1.5) +
+  scale_y_continuous(sec.axis = sec_axis(~.*1, 
+                                         breaks = c(99.4, 27),
+                                         labels = c("Example 1\n(99%)", "Example 2\n(27%)"))) +
+  scale_x_discrete(expand = c(0, 0.02)) +
+  labs(x = "Week", y = "Infection (%)", 
+       title = "Simulated disease progress", 
+       subtitle = "Example 1 had an unconditional, constant rate of infection \nExample 2 had an infection rate dependent on rainfall and temperature") +
+  theme(legend.position = "none",
+        axis.text = element_text(color = "black"),
+        axis.title = element_text(face = "bold"))
+
+```
+
+Now we've compared a model with a constant rate of infection to a model with a rate of infection dependent on the weather. Now we'll move to a more complicated and realistic exercise where weather prediction isn't perfect. 
+
+## **500 simulations of disease progression**
+
+Weather patterns change, influencing the ways in which we can forecast disease development. We will simulate multiple weather scenarios to see how a range of possible environmental conditions impact disease development. 
+
+We'll build on the disease parameters in Example 2. The rate of infection is dependent on rainfall and is optimal at 20°C and above. The difference is that we are going to forecast disease progression for 500 different weather scenarios to see the range of possible outcomes. 
+
+In the next chunk of code, we will create a function for the simulation. 
+
+```{r DiseaseCast}
+
+# Define 'DiseaseCast' as a function that requires rate of infection, number of weeks to model, the starting disease %, and the probability of rain in a given week
+DiseaseCast <- function(rate, nweeks, start, rprob){
   
-    perinf <-  mutate(perinf, week = 1:nweeks, 
-                      p_inf = if_else(p_inf>=100, 100, p_inf))  
+  # Create a data frame 'dis.data' with placeholder columns for inf (% infected) and temp, and data for rainfall and week
+  dis.data <- data.frame(inf = rep(0, nweeks),
+                        rain = rbinom(n = nweeks, size = 1, prob = rprob),
+                        temp = rep(0, nweeks),
+                        week = 1:nweeks)
+  
+  # Fill in the starting % infected and temperature
+  dis.data$inf[1] <- start
+  dis.data$temp[1] <- 20
+  
+  # Use a for loop to simulate the temperature over nweeks
+  for (j in 2:nweeks){
+    
+    dis.data$temp[j] <- dis.data$temp[j-1] + rnorm(n = 1, mean = 0, sd = 2)
   }
-  perinf
+  
+  # Transform dis.data to produce rates of infection dependent on rain and temp. Use an if_else statement to avoid problems with negative temp
+  dis.data <- mutate(dis.data, 
+                    temp = if_else(temp < 0, 0, temp)) %>%
+    mutate(rate = rate * rain * (1 + (temp - 20)/20))
+  
+  # Calculate the % of infection over time
+  for (j in 2:10){
+    
+  # Calculate the % infected using an if_else statement to avoid scenarios where the total % infected is 100% or above
+    dis.data$inf[j] <- dis.data$inf[j-1] * (1 + dis.data$rate[j-1]) * (1 - (if_else(dis.data$inf[j-1] >= 100, 1, dis.data$inf[j-1]/100)))
+  
+  # Mutate dis.data to have a column for the week, and to avoid adding % infected values of 100% or more
+  dis.data <- mutate(dis.data,
+                    week = 1:nweeks,
+                    inf = if_else(inf >= 100, 100, inf))
+  }
+  
+  # Return the data frame object
+  dis.data
 }
 
-# Using functions from the purrr package, we will simulate multiple scenarios
-n_simu <- 500  # Number of simulations
+```
 
-simul_1 <- map(seq_len(n_simu), ~discast(rate=1,nweeks=10,start=1,rprob=.5)) %>% 
-           map2(., 1:n_simu, ~cbind(.x, RUN = .y)) %>% bind_rows()
+Now we have a custom function that will allow us to quickly model scenarios. We'll add components from the `purrr` package to help us quickly run 500 simulations. 
 
+```{r 500_simulations}
+
+# Define the number of simulations
+n <- 500
+
+# Create an XX object where every iteration of the simulation is stored
+simul_1 <- map(seq_len(n),
+               ~DiseaseCast(r = 1, nweeks = 10, start = 1, rprob = 0.5)) %>%
+  
+  # Format the resulting object
+  map2(., 1:n, ~cbind(.x, RUN = .y)) %>%
+  bind_rows()
+
+# Inspect the object
 head(simul_1)
 tail(simul_1)
 
 ```
 
-<br>
+Now we can visualize the outcomes of these 500 simulations to see the range of possible disease progression scenarios. We'll create two figures. The first will show each simulation's disease progression trajectory over time, and the second will be a box plot showing the range of final disease states. 
 
-Visually, here is how the plot of the different scenarios.
+```{r simulation_visualization, fig.width = 8, fig.height = 6}
 
-```{r, fig.width=8, fig.height=6}
+# Create the line plot showing disease trajectory for each simulation
+a <- ggplot(simul_1) + 
+  geom_line(aes(x = week, y = inf, group = RUN, color = RUN), color = "grey") +
+  labs(x = "Week", y = "Infection (%)", 
+       title = "500 simulations of disease development",
+       subtitle = "Left graph: Disease progress for each simulated event over time. Right graph: Final infection level (%)") +
+  scale_x_continuous(breaks = 1:10, expand = c(0.0, 0.1)) +
+  theme(legend.position = "none",
+        axis.text = element_text(color = "black"),
+        axis.title = element_text(face = "bold"))
 
-  a <- ggplot(simul_1) +
-  geom_line(aes(x= week, y = p_inf, color = RUN, group = RUN), color = "grey")+
-    labs(x = "Weeks", y = "Infection (%)", 
-       title = "Results of 500 simulations of disease development",
-       subtitle = "Left graph = disease progress for each simulated event\nBoxplot = final infection level (%)")+
+# Create the boxplot showing final disease infection level
+b <- filter(simul_1, week == 10) %>% 
+  ggplot(aes(x = week, y = inf)) +
+  geom_boxplot(outlier.alpha = 0) +
+  geom_jitter(alpha = 0.15, width = 0.3) +
+  theme(panel.background = element_blank(), 
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank())
+
+# Plot the two parts, a and b, together
+a + b + plot_layout(ncol = 2, widths = c(7, 1))
+
+```
+
+Now we've seen a range of disease progression outcomes based on 500 simulations with identical parameters, but random outcomes. Now we'll explore what happens when one of the parameters, the probability of rain, changes. 
+
+## **500 simulations of different rain probabilities** 
+
+In the next example, we'll start with all of the same parameters *except* the probability of rain. We'll create a group of simulations with a 10%, 30%, 50%, 70%, and 90% change of rain. 
+
+In the next chunk of code, we'll create the simulated data for each group. Then, we'll bind each data set together and filter for Week 10 outcomes.  
+
+```{r rain_probability}
+
+# 500 simulations of 10% chance of rain
+simul_10 <- map(seq_len(n),
+                ~DiseaseCast(rate = 1, nweeks = 10, start = 1, rprob = 0.1)) %>%
+  map2(., 1:n, ~cbind(.x, RUN = .y)) %>% 
+  bind_rows() %>%
+  mutate(prob = "p10")
+
+# 30% chance of rain
+simul_30 <- map(seq_len(n),
+                ~DiseaseCast(rate = 1, nweeks = 10, start = 1, rprob = 0.3)) %>%
+  map2(., 1:n, ~cbind(.x, RUN = .y)) %>% 
+  bind_rows() %>%
+  mutate(prob = "p30")
+
+# 50% chance of rain
+simul_50 <- map(seq_len(n),
+                ~DiseaseCast(rate = 1, nweeks = 10, start = 1, rprob = 0.5)) %>%
+  map2(., 1:n, ~cbind(.x, RUN = .y)) %>% 
+  bind_rows() %>%
+  mutate(prob = "p50")
+
+# 70% chance of rain
+simul_70 <- map(seq_len(n),
+                ~DiseaseCast(rate = 1, nweeks = 10, start = 1, rprob = 0.7)) %>%
+  map2(., 1:n, ~cbind(.x, RUN = .y)) %>% 
+  bind_rows() %>%
+  mutate(prob = "p70")
+
+# 90% chance of rain
+simul_90 <- map(seq_len(n),
+                ~DiseaseCast(rate = 1, nweeks = 10, start = 1, rprob = 0.9)) %>%
+  map2(., 1:n, ~cbind(.x, RUN = .y)) %>% 
+  bind_rows() %>%
+  mutate(prob = "p90")
+
+# Combine each data set and select for week 10
+comb_simul <- bind_rows(simul_10, simul_30, simul_50, simul_70, simul_90) %>% filter(week == 10) 
+
+```
+
+Now that we have the simulated data, we can visualize how the outcomes change based on the chance of rain. 
+
+```{r rain_prob_plot}
+
+ggplot(comb_simul, aes(x = prob, y = inf)) +
+  geom_boxplot(outlier.alpha = 0) +
+  geom_jitter(alpha = 0.15, widdth = 0.3, color = "grey50") +
+  labs(x = "Probability of rain", y = "Infection (%)",
+       title = "Results of 500 simulations of different rain probabilities at Week 10") +
+  scale_x_discrete(labels = c("10%", "30%", "50%", "70%", "90%")) +
+  theme(legend.position = "none",
+        axis.text = element_text(color = "black"),
+        axis.title = element_text(face = "bold"))
+
+```
+
+We can see that the probability of rain can have a big influence on the likely outcome of a disease. A majority of the simulations with 10% probability of rain had relatively low disease at Week 10, while those with 90% chance of rain were much higher. 
+
+## **500 simulations of different rates of infection**
+
+In the next example, we will explore how the initial rate of infection (r) affects the intensity of the disease at Week 10. Understanding how the initial rate of infection can help us predict different diseases, but it can also help us model the outcomes of different intervention strategies. 
+
+In the next chunk of code, we will create data sets with different initial rate of infection. We'll use rates of infections ranging from 0.25 to 2 at intervals of 0.25. 
+
+```{r infection_rates}
+
+# Create data for 500 simulations with r = 0.25
+simul_0.25 <- map(seq_len(n),
+                 ~DiseaseCast(rate = 0.25, nweeks = 10, start = 1, rprob = 0.5)) %>%
+                   map2(., 1:n, ~cbind(.x, RUN = .y)) %>%
+                   bind_rows() %>%
+                   mutate(rate = "r_0.25")
+
+# r = 0.50
+simul_0.5 <- map(seq_len(n),
+                 ~DiseaseCast(rate = 0.5, nweeks = 10, start = 1, rprob = 0.5)) %>%
+                   map2(., 1:n, ~cbind(.x, RUN = .y)) %>%
+                   bind_rows() %>%
+                   mutate(rate = "r_0.5")
+
+# r = 0.75
+simul_0.75 <- map(seq_len(n),
+                 ~DiseaseCast(rate = 0.75, nweeks = 10, start = 1, rprob = 0.5)) %>%
+                   map2(., 1:n, ~cbind(.x, RUN = .y)) %>%
+                   bind_rows() %>%
+                   mutate(rate = "r_0.75")
+
+# r = 1.0
+simul_1.0 <- map(seq_len(n),
+                 ~DiseaseCast(rate = 1.0, nweeks = 10, start = 1, rprob = 0.5)) %>%
+                   map2(., 1:n, ~cbind(.x, RUN = .y)) %>%
+                   bind_rows() %>%
+                   mutate(rate = "r_1.0")
+
+# r = 1.25
+simul_1.25 <- map(seq_len(n),
+                 ~DiseaseCast(rate = 1.25, nweeks = 10, start = 1, rprob = 0.5)) %>%
+                   map2(., 1:n, ~cbind(.x, RUN = .y)) %>%
+                   bind_rows() %>%
+                   mutate(rate = "r_1.25")
+
+# r = 1.5
+simul_1.5 <- map(seq_len(n),
+                 ~DiseaseCast(rate = 1.5, nweeks = 10, start = 1, rprob = 0.5)) %>%
+                   map2(., 1:n, ~cbind(.x, RUN = .y)) %>%
+                   bind_rows() %>%
+                   mutate(rate = "r_1.5")
+
+# r = 1.75
+simul_1.75 <- map(seq_len(n),
+                 ~DiseaseCast(rate = 1.75, nweeks = 10, start = 1, rprob = 0.5)) %>%
+                   map2(., 1:n, ~cbind(.x, RUN = .y)) %>%
+                   bind_rows() %>%
+                   mutate(rate = "r_1.75")
+
+# r = 2.0
+simul_2.0 <- map(seq_len(n),
+                 ~DiseaseCast(rate = 2.0, nweeks = 10, start = 1, rprob = 0.5)) %>%
+                   map2(., 1:n, ~cbind(.x, RUN = .y)) %>%
+                   bind_rows() %>%
+                   mutate(rate = "r_2.0")
+```
+
+Now we'll combine each of these data sets and plot the disease outcome at Week 10 like we did in the previous example. 
+
+```{r infection_rates_plot}
+
+# Combine each data set
+comb_simul <- bind_rows(simul_0.25, simul_0.5, simul_0.75, simul_1.0,
+                        simul_1.25, simul_1.5, simul_1.75, simul_2.0) %>%
+  filter(week == 10)
+
+# Plot
+ggplot(comb_simul, aes(x = rate, y = inf)) + 
+  geom_boxplot(outlier.alpha = 0) +
+  geom_jitter(alpha = 0.15, width = 0.3, color = "grey50") +
+  labs(x = "Rate of infection", y = "Infection (%)",
+       title = "500 simulations of different rates of infection (r)") +
+  scale_x_discrete(labels = c("0.25", "0.5", "0.75", "1.0", "1.25", "1.5", "1.75", "2.0")) +
+  theme(legend.position = "none",
+        axis.text = element_text(color = "black"),
+        axis.title = element_text(face = "bold"))
+
+```
+
+## **Considering intervention**
+
+We will now consider the forecasting models we've been working with as support systems. When diseases occur, it can be helpful to model how certain interventions, such as fungicides, may help the situation. In this case, the interventions we will model don't heal infected plants, but they do prevent new infections. 
+
+In the example we will consider, the model is simple. When the predicted number of infected plants is above a certain threshold, we will use an intervention to reduce the disease to 10% of its potential level. 
+
+We will build on our function `DiseaseCast()` by adding the ability to calculate disease outcomes when intervention occurs. In the next chunk of code, the following variables have certain meanings:
+
+>r: the starting rate of infection
+>nweeks: the number of weeks to forecast
+>start: the starting percentage of infected plants
+>rprob: the probability of rain in each week
+>threshold: the amount intervention will reduce the rate of infection to
+>action: if any intervention will be applied
+
+```{r intervention_cast}
+
+# Define InterventionCast()
+InterventionCast <- function(rate, nweeks, start, rprob, threshold, action){
   
-  scale_x_continuous(breaks = 1:10, expand = c(0.0,0.1))+
+  # Create data frame with placeholder columns for week, rain, temp, % infected, and action taken
+  dis.data <- data.frame(week = 1:nweeks,
+                         rain = rbinom(n = nweeks, size = 1, prob = rprob),
+                         temp = c(20, rep(0, (nweeks-1))), 
+                         inf = c(1, rep(0, (nweeks - 1))))
   
-  theme(
-    legend.position = "none", 
-    axis.text = element_text(color="black"), 
-    axis.title = element_text(face="bold"))
-  
-  b <- filter(simul_1,week == 10) %>% 
-  ggplot(aes(x= week, y = p_inf)) +
-    geom_boxplot(outlier.alpha = 0)+
-    geom_jitter(alpha = 0.15, width = 0.3)+
+  # Populate dis.data$temp with temperature data
+  for (j in 2:nweeks){
     
-    theme(
-    panel.background = element_blank(),
-    axis.title = element_blank(),
-    axis.text = element_blank(),
-    axis.ticks = element_blank())
-
-  a+ b + 
-    plot_layout(
-      ncol = 2, 
-      widths = c(7, 1)   ) 
-  
-```
-
-<br>
-
-Since the rate is conditional on weather conditions, we will simulate how a change in the probability of rain will change disease (infection) progress. Below, we will create a series of plots showing final disease (infection at week 10) intensity based on 500 simulation for each situation. The first scenario shows 500 simulations when there is a 10% probability of rain each each week, the second box 30%, followed by 50%, 70%, and 90%, respectively. This example illustrates the importance of rain on disease development.
-
-```{r}
-# Each overall scenario changes the probability of rain
-
-# Number of simulations
-n_simu <- 500
-
-simul_01 <- map(seq_len(n_simu), ~discast(rate=1,nweeks=10,start=1,rprob=.1)) %>% 
-           map2(., 1:n_simu, ~cbind(.x, RUN = .y)) %>% bind_rows() %>% 
-  mutate(prob= "p01")
-
-simul_03 <- map(seq_len(n_simu), ~discast(rate=1,nweeks=10,start=1,rprob=.3)) %>% 
-           map2(., 1:n_simu, ~cbind(.x, RUN = .y)) %>% bind_rows() %>% 
-  mutate(prob= "p03")
-
-simul_05 <- map(seq_len(n_simu), ~discast(rate=1,nweeks=10,start=1,rprob=.5)) %>% 
-           map2(., 1:n_simu, ~cbind(.x, RUN = .y)) %>% bind_rows() %>% 
-  mutate(prob= "p05")
-
-
-simul_07 <- map(seq_len(n_simu), ~discast(rate=1,nweeks=10,start=1,rprob=.7)) %>% 
-           map2(., 1:n_simu, ~cbind(.x, RUN = .y)) %>% bind_rows() %>% 
-  mutate(prob= "p07")
-
-
-simul_09 <- map(seq_len(n_simu), ~discast(rate=1,nweeks=10,start=1,rprob=.9)) %>% 
-           map2(., 1:n_simu, ~cbind(.x, RUN = .y)) %>% bind_rows() %>% 
-  mutate(prob= "p09")
-
-bind_rows(simul_01, simul_03, simul_05, simul_07, simul_09) %>% 
-  filter(week==10) %>% 
- ggplot(aes(x= prob, y = p_inf)) +
-    geom_boxplot(outlier.alpha = 0)+
-    geom_jitter(alpha = 0.15, width = 0.3, color="grey50")+
-
-labs(x = "Probability of rain", y = "Infection (%)", 
-     title = "Results of 500 simulations -  final disease intensity", 
-     subtitle = "Each boxplot shows the results for 500 simulations where the probability of rain varies")+
-  scale_x_discrete(labels = c("10%", "30%", "50%", "70%", "90%"))+ 
-   
-  theme(
-    legend.position = "none", 
-    axis.text = element_text(color="black"), 
-    axis.title = element_text(face="bold"))
-
-```
-
-<br>
-
-Now, in the next scenario, we will explore how the initial disease infection rate affects final disease intensity. As we have seen in earlier topics, the rate of disease infection can be affected by different factors. For example, the use of genetic resistance or through adoption of cultural practices that do not favor disease development. The goal is to see how affecting the rate drives the overall epidemic.
-
-
-```{r}
-# Change the rate of disease increase
-
-simul_025 <- map(seq_len(n_simu), ~discast(rate=.25,nweeks=10,start=1,rprob=.5)) %>% 
-           map2(., 1:n_simu, ~cbind(.x, RUN = .y)) %>% bind_rows() %>% 
-  mutate(prob= "r_025")
-
-simul_050 <- map(seq_len(n_simu), ~discast(rate=.5, nweeks=10,start=1,rprob=.5)) %>% 
-           map2(., 1:n_simu, ~cbind(.x, RUN = .y)) %>% bind_rows() %>% 
-  mutate(prob= "r_050")
-
-simul_075 <- map(seq_len(n_simu), ~discast(rate=.75,nweeks=10,start=1,rprob=.5)) %>% 
-           map2(., 1:n_simu, ~cbind(.x, RUN = .y)) %>% bind_rows() %>% 
-  mutate(prob= "r_075")
-
-
-simul_100 <- map(seq_len(n_simu), ~discast(rate=1,nweeks=10,start=1,rprob=.5)) %>% 
-           map2(., 1:n_simu, ~cbind(.x, RUN = .y)) %>% bind_rows() %>% 
-  mutate(prob= "r_100")
-
-
-simul_125 <- map(seq_len(n_simu), ~discast(rate=1.25,nweeks=10,start=1,rprob=.5)) %>% 
-           map2(., 1:n_simu, ~cbind(.x, RUN = .y)) %>% bind_rows() %>% 
-  mutate(prob= "r_125")
-
-simul_150 <- map(seq_len(n_simu), ~discast(rate=1.5,nweeks=10,start=1,rprob=.5)) %>% 
-           map2(., 1:n_simu, ~cbind(.x, RUN = .y)) %>% bind_rows() %>% 
-  mutate(prob= "r_150")
-
-simul_175 <- map(seq_len(n_simu), ~discast(rate=1.75,nweeks=10,start=1,rprob=.5)) %>% 
-           map2(., 1:n_simu, ~cbind(.x, RUN = .y)) %>% bind_rows() %>% 
-  mutate(prob= "r_175")
-
-simul_200 <- map(seq_len(n_simu), ~discast(rate=2,nweeks=10,start=1,rprob=.5)) %>% 
-           map2(., 1:n_simu, ~cbind(.x, RUN = .y)) %>% bind_rows() %>% 
-  mutate(prob= "r_200")
-
-
-bind_rows(simul_025, simul_050, simul_075, simul_100, simul_125,
-          simul_150, simul_175, simul_200) %>% 
-    filter(week==10) %>% 
- ggplot(aes(x= prob, y = p_inf)) +
-    geom_boxplot(outlier.alpha = 0)+
-    geom_jitter(alpha = 0.15, width = 0.3, color="grey50")+
-
-labs(x = "Rate of disease progress", y = "Infection (%)", 
-     title = "Results of 500 simulations -  final disease intensity", 
-     subtitle = "Each boxplot shows the results for 500 simulations with different rates of disease progress")+
-  scale_x_discrete(labels = c("0.25", "0.50", "0.75", "1.0", "1.25", "1.50", "1.75", "2.00"))+ 
-   
-  theme(
-    legend.position = "none", 
-    axis.text = element_text(color="black"), 
-    axis.title = element_text(face="bold"))
-
-```
-
-<br>
-
-## Considering intervention (management)
-
-We will now consider the forecasting model as a decision support system. In this generic example, the model is rather simple - when the predicted number of plants infected is above a pre-defined threshold, an intervention is made to reduce the rate of disease increase to a level that is 10% of what it would be without the intervention. One way to think about this is what would be an expected response with a fungicide application. It is also important to mention that with a model such as this, we are not "healing" the plant, rather trying to use the model to illustrate how we prevent new infections.  
-
-
-```{r}
-
-interven <- function(rate,nweeks,start,rprob,inter,action){
-  # rate is the increase in disease under conducive conditions
-  # nweeks is the number of weeks being considered
-  # start is the starting infection percentage
-  # rprob is the probability of rain in any given week
-  # inter indicates whether the intervention rule will be used or not
-  # action is the threshold for implement the intervention  
-
-  perinf <- data.frame(p_inf = rep(0,nweeks), 
-    # The probability of rain each week is independent, but with the same probability                   
-                       rain = rbinom(n=nweeks,size=1,prob=rprob), 
-                       temp = rep(0,nweeks))
-  perinf[1,1] <- start
-  perinf[1,3] <- 20
-
-  # Temperature (the temperature will depend on the previous day's temperature)
-  for(j in 2:nweeks){
-    perinf$temp[j] <- perinf$temp[j-1] + rnorm(n=1,mean=0,sd=2) }
-  
-  # Generate the time series of rates
-  perinf <- 
-    mutate(perinf, temp = if_else(temp<0,0,temp)) %>%  # To avoid problem with negative temp
-    mutate(rate = rate * rain * (1+(temp - 20)/20))
- 
-  # If our we apply an intervention, the rate will decrease to 10% of what it was 
-for (j in 2:nweeks) {
-    t_rate <- perinf$rate[j-1]
-    if(perinf$p_inf[j-1] > action & inter) {
-               t_rate <- 0.1*t_rate} 
-    
-   # perinf$p_inf[j] <- perinf$p_inf[j-1] * 
-   #    (1 + t_rate*(1 - perinf$p_inf[j-1]/100))}
-   # 
-  
-     perinf$p_inf[j] <- perinf$p_inf[j-1] * 
-      (1 + t_rate*(1 - (if_else(perinf$p_inf[j-1]>=100, 1, perinf$p_inf[j-1]/100))))
-}
-  
-      perinf <-  mutate(perinf, week = 1:nweeks, 
-                      p_inf = if_else(p_inf>=100, 100, p_inf))  
-  
-    perinf
-}
-
-   
-inter_30_Y <- map(seq_len(n_simu), ~interven(rate = 1,nweeks = 10,start = 1,rprob = 0.5,inter = TRUE,action = 30)) %>% 
-            map2(., 1:n_simu, ~cbind(.x, RUN = .y)) %>% bind_rows() %>% 
-  mutate(action= "inter_10", interv = "YES")
-   
-
-inter_30_N <- map(seq_len(n_simu), ~interven(rate = 1,nweeks = 10,start = 1,rprob = 0.5,inter = FALSE,action = 30)) %>% 
-            map2(., 1:n_simu, ~cbind(.x, RUN = .y)) %>% bind_rows() %>% 
-  mutate(action= "inter_10", interv = "NO")
-
-head(inter_30_Y)
-
-```
-
-<br>
-
-In the plots create with the code below, we will show the two scenarios, with and without intervention. The upper plot shows the results from 500 simulations where disease development was a function of weather conditions. The lower plot shows the same type of result, but in this situation, an intervention was made using a 30% threshold (i.e., an intervention was made when the percentage of infected plants was ≥30%. The intervention reduced the rate of progress to only 10% of what it would normally be. It is important to note that while the intervention does reduce the overall disease progress (for example, fewer situations where disease reached 60% or more), this intervention did not completely stop disease development.
-
-
-```{r, fig.width=8, fig.height=10}
-
-  no_intervention <- 
-  ggplot(inter_30_N) +
-  geom_line(aes(x= week, y = p_inf, color = RUN, group = RUN), color = "grey")+
-    labs(x = "Weeks", y = "Infection (%)", 
-       title = "NO INTERVENTION",
-       subtitle = "Disease progess (rate) is condtional to temperature and rain, but without an intervention") +
-  
-  scale_x_continuous(breaks = 1:10, expand = c(0.0,0.1))+
-  
-  theme(
-    legend.position = "none", 
-    axis.text = element_text(color="black"), 
-    axis.title = element_text(face="bold"))
-  
-  no_intervention_box <- filter(inter_30_N,week == 10) %>% 
-  ggplot(aes(x= week, y = p_inf)) +
-    geom_boxplot(outlier.alpha = 0)+
-    geom_jitter(alpha = 0.15, width = 0.3, color="grey50")+
-    
-    theme(
-    panel.background = element_blank(),
-    axis.title = element_blank(),
-    axis.text = element_blank(),
-    axis.ticks = element_blank())
-
- with_intervention <- 
-  ggplot(inter_30_Y) +
-  geom_line(aes(x= week, y = p_inf, color = RUN, group = RUN), color = "grey")+
-  geom_hline(aes(yintercept=30), linetype = "dashed")+  
-    labs(x = "Weeks", y = "Infection (%)", 
-       title = "WITH INTERVENTION",
-       subtitle = "When infection is \u2265 30% an intervention reduces the rate of disease progress")+
-  
-  scale_x_continuous(breaks = 1:10, expand = c(0.0,0.1))+
-  scale_y_continuous(limits = c(0,100))+
-
-  theme(
-    legend.position = "none", 
-    axis.text = element_text(color="black"), 
-    axis.title = element_text(face="bold"))+
-    annotate(label = "30% intervention threshold", geom = "text", x = 1, y = 33, hjust = "left")  
-  
-  with_intervention_box <-
-    filter(inter_30_Y,week == 10) %>% 
-  ggplot(aes(x= week, y = p_inf)) +
-    geom_boxplot(outlier.alpha = 0)+
-    geom_jitter(alpha = 0.15, width = 0.3, color="grey50")+
-    scale_y_continuous(limits = c(0,100))+
-
-    theme(
-    panel.background = element_blank(),
-    axis.title = element_blank(),
-    axis.text = element_blank(),
-    axis.ticks = element_blank())
-
-  no_intervention + no_intervention_box +
-  with_intervention + with_intervention_box + 
-    plot_layout(
-      ncol = 2, 
-      nrow = 2,
-      widths = c(7, 1, 
-                 7, 1)   ) 
-  
-```
-
-<br>
-
-Finally, the plots below shows results from simulations using different intervention thresholds.
-
-```{r }
-n_simu = 100 # reduce the number of simulations for computational efficiency 
-FUN_inter <- function(int_perc){
-  map(seq_len(n_simu), ~interven(rate = 1,nweeks = 10,start = 1,rprob = 0.5,inter = TRUE,action = int_perc)) %>% 
-    map2(., 1:n_simu, ~cbind(.x, RUN = .y)) %>% 
-    bind_rows() %>% 
-    mutate(action= int_perc, interv = "YES")
+    # The current week's temp is dependent on previous week's temp
+    dis.data$temp[j] <- dis.data$temp[j-1] + rnorm(n = 1, mean = 0, sd = 2)
   }
+  
+  # Replace any negative temp values with 0 and pass dis.data on 
+  dis.data <- mutate(dis.data, temp = if_else(temp < 0, 0, temp)) %>% 
+    
+    # Calculate the rate (dependent on temp and rain) for each week
+    mutate(rate = rate * rain * (1 + (temp - 20)/20))
+  
+  # Calculate the % infected
+  for (j in 2:nweeks){
+    
+    # IF the previous % infected is above 30% AND we are considering intervention, rate is 1/10th what it would be
+    if (dis.data$inf[j-1] > threshold & action){
+      
+      # The new rate of infection is 1/10th what it would be
+      r <- 0.1 * dis.data$rate[j-1]
+      
+      # If not...
+    } else {
+      
+      # We use the same rate of spread, dependent only on rain and temp
+      r <- dis.data$rate[j-1]
+    }
+    
+    # The % infected is dependent on the previous % infected and whichever rate of spread is appropriate
+      dis.data$inf[j] <- dis.data$inf[j-1] * (1 + r) * (1 - (if_else(dis.data$inf[j-1] >= 100, 1, dis.data$inf[j-1]/100)))
+  }
+  
+  # Return the data frame
+  dis.data
+}
 
-inter_yes <- map(c(5, 10, 15, 20, 40, 60, 80, 100),FUN_inter) %>% 
+
+```
+
+Now we will use `InterventionCast()` to run 500 simulations for disease progression when intervention is considered and when it is not. 
+
+```{r intervention_data}
+
+# Create data for 500 simulations when intervention is considered
+simul_int <- map(seq_len(n),
+                 ~InterventionCast(rate = 1, nweeks = 10, rprob = 0.5, threshold = 30, action = TRUE)) %>% 
+  map2(., 1:n, ~cbind(.x, RUN = .y)) %>%
   bind_rows()
 
-# Show boxplots
+# When intervention is not considered
+simul_no.int <- map(seq_len(n),
+                 ~InterventionCast(rate = 1, nweeks = 10, rprob = 0.5, threshold = 30, action = FALSE)) %>% 
+  map2(., 1:n, ~cbind(.x, RUN = .y)) %>%
+  bind_rows()
 
-inter_yes %>% 
-    filter(week==10) %>% 
-   ggplot(aes(x= factor(action), y = p_inf, group = action)) +
-    geom_boxplot( outlier.alpha = 0)+
-    geom_jitter(alpha = 0.15, width = 0.3, color="grey50")+
-  
-  labs(x = "Action threshold (%)", 
-       y = "Infection (%)", 
-       title = "Final infection level with different intervention thresholds", 
-       subtitle = "With intervention, the rate is reduced to 10% of its value")+
-  scale_x_discrete(labels = c("5%", "10%", "15%", "20%", "40%", "60%", "80%", "No intervention"))+ 
-   
-  theme(
-    legend.position = "none", 
-    axis.text = element_text(color="black"), 
-    axis.title = element_text(face="bold"))
 ```
 
+We will now visualize the results for both groups of simulations. 
 
+```{r intervention_visual}
 
+# Create a plot for the disease trajectory over time for the group WITH intervention
+int.tra <- ggplot(simul_int) +
+  geom_line(aes(x = week, y = inf, color = RUN, group = RUN), color = "grey") +
+    geom_hline(aes(yintercept = 30), linetype = "dashed") +
+  labs(x = "Week", y = "Infection (%)",
+       title = "Disease WITH intervention", 
+       subtitle = "When the percent of infected plants was above 30%, treatment was applied and the rate of infection was decreased to 1/10th") +
+  scale_x_continuous(breaks = 1:10, expand = c(0.0, 0.1)) +
+    ylim(0,80) +
+ theme(legend.position = "none", 
+        axis.text = element_text(color = "black"),
+        axis.title = element_text(face = "bold")) +
+        annotate(label = "30% intervention threshold",
+                 geom = "text", x = 1, y = 33, hjust = "left")
 
+# Create a boxplot for the final % infected WITH intervention
+int.box <- filter(simul_int, week == 10) %>%
+  ggplot(aes(x = week, y = inf)) +
+  geom_boxplot(outlier.alpha = 0) +
+  geom_jitter(alpha = 0.15, width = 0.3, color = "grey50") +
+  theme(panel.background = element_blank(),
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank())
+
+# Create a plot for the disease trajectory over time for the group WITHOUT intervention
+no.int.tra <- ggplot(simul_no.int) +
+  geom_line(aes(x = week, y = inf, color = RUN, group = RUN), color = "grey") +
+  labs(x = "Week", y = "Infection (%)",
+       title = "Disease WITHOUT intervention", 
+       subtitle = "No intervention was applied") +
+  scale_x_continuous(breaks = 1:10, expand = c(0.0, 0.1)) +
+  theme(legend.position = "none", 
+        axis.text = element_text(color = "black"),
+        axis.title = element_text(face = "bold")) +
+  ylim(0,80)
+
+# Create a boxplot for the final % infected WITHOUT intervention
+no.int.box <- filter(simul_no.int, week == 10) %>%
+  ggplot(aes(x = week, y = inf)) +
+  geom_boxplot(outlier.alpha = 0) +
+  geom_jitter(alpha = 0.15, width = 0.3, color = "grey50") +
+  theme(panel.background = element_blank(),
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank())
+
+# Plot all four plot items
+int.tra + int.box + no.int.tra + no.int.box +
+  plot_layout(ncol = 2, nrow = 2, widths = c(7, 1, 7, 1))
+
+```
+
+In the plot without intervention, the progression of disease was a function of weather conditions alone. In the plots where intervention was used, we can see that disease progression decreased after the percent infected reached above 30%. Importantly, we can see that these two groups of scenarios did not result in completely different outcomes. When intervention was used, it became rarer for disease development to reach above 60%, but otherwise disease progression was similar.
+
+## **500 simulations of intervention thresholds**
+In the final example, we can visualize what happens when the intervention threshold is changed. We'll use the same parameters as in the last example except with intervention thresholds of 5, 10, 15, 20, 40, 60, and 80%. To save time, we will only run 100 simulations of each scenario. 
+
+```{r intervention_range}
+
+# Change n, the number of simulations to run
+n = 100
+
+# Run 100 simulations with threshold = 5
+simul_05 <- map(seq_len(n),
+                ~InterventionCast(rate = 1, nweeks = 10, start = 1, rprob = 0.5, threshold = 5, action = TRUE)) %>%
+  map2(., 1:n, ~cbind(.x, RUN = .y)) %>% 
+  bind_rows() %>%
+  mutate(threshold = "5") 
+
+# Run 100 simulations with threshold = 10
+simul_10 <- map(seq_len(n),
+                ~InterventionCast(rate = 1, nweeks = 10, start = 1, rprob = 0.5, threshold = 10, action = TRUE)) %>%
+  map2(., 1:n, ~cbind(.x, RUN = .y)) %>% 
+  bind_rows() %>%
+  mutate(threshold = "10") 
+
+# Run 100 simulations with threshold = 15
+simul_15 <- map(seq_len(n),
+                ~InterventionCast(rate = 1, nweeks = 10, start = 1, rprob = 0.5, threshold = 15, action = TRUE)) %>%
+  map2(., 1:n, ~cbind(.x, RUN = .y)) %>% 
+  bind_rows() %>%
+  mutate(threshold = "15") 
+
+# Run 100 simulations with threshold = 20
+simul_20 <- map(seq_len(n),
+                ~InterventionCast(rate = 1, nweeks = 10, start = 1, rprob = 0.5, threshold = 20, action = TRUE)) %>%
+  map2(., 1:n, ~cbind(.x, RUN = .y)) %>% 
+  bind_rows() %>%
+  mutate(threshold = "20") 
+
+# Run 100 simulations with threshold = 40
+simul_40 <- map(seq_len(n),
+                ~InterventionCast(rate = 1, nweeks = 10, start = 1, rprob = 0.5, threshold = 40, action = TRUE)) %>%
+  map2(., 1:n, ~cbind(.x, RUN = .y)) %>% 
+  bind_rows() %>%
+  mutate(threshold = "40") 
+
+# Run 100 simulations with threshold = 60
+simul_60 <- map(seq_len(n),
+                ~InterventionCast(rate = 1, nweeks = 10, start = 1, rprob = 0.5, threshold = 60, action = TRUE)) %>%
+  map2(., 1:n, ~cbind(.x, RUN = .y)) %>% 
+  bind_rows() %>%
+  mutate(threshold = "60") 
+
+# Run 100 simulations with threshold = 80
+simul_80 <- map(seq_len(n),
+                ~InterventionCast(rate = 1, nweeks = 10, start = 1, rprob = 0.5, threshold = 80, action = TRUE)) %>%
+  map2(., 1:n, ~cbind(.x, RUN = .y)) %>% 
+  bind_rows() %>%
+  mutate(threshold = "80") 
+
+```
+
+Now we can visualize the disease outcome at Week 10 for each of the threshold values we've simulated. 
+
+```{r threshold_visual}
+
+# First, we need to combine each group of simulations (including the group of simulations with no intervention)
+simul_thresh <- bind_rows(simul_05, simul_10, simul_15, simul_20, simul_40, simul_60, simul_80, simul_no.int) %>%
+  
+  # Then we'll filter for Week 10
+  filter(., week == 10)
+  
+  # And now we'll plot boxplots for each threshold value
+  ggplot(simul_thresh, aes(x = factor(threshold), y = inf, group = threshold)) +
+  geom_boxplot(outlier.alpha = 0) +
+  geom_jitter(alpha = 0.15, width = 0.3, color = "grey50") +
+  labs(x = "Intervention threshold %",
+       y = "Infection (%)",
+       title = "Final infection level with different intervention thresholds",
+       subtitle = "Intervention reduces rate of infection to 10% of its value") +
+  scale_x_discrete(labels = c("5%", "10%", "15%", "20%", "40%", "60%", "80%", "No intervention")) + theme(legend.position = "none", 
+      axis.text = element_text(color = "black"),
+      axis.title = element_text(face = "bold"))
+
+```
